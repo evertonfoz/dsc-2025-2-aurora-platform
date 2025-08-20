@@ -4,7 +4,7 @@ Microserviço **users** com **NestJS** (TypeScript), **TypeORM** e **PostgreSQL*
 Docker/Compose, migrações, DTOs/validação, documentação **Swagger**, **testes** (unit/E2E) e **health check**. Arquitetura
 database-per-service, preparada para evolução com eventos (Outbox/Sagas) e API Gateway/BFF.
 
-> Porta padrão da API: **3000** · Banco: **usersdb** (PostgreSQL)
+> Porta padrão da API: **3100** · Banco: **usersdb** (PostgreSQL)
 
 ---
 
