@@ -71,3 +71,18 @@ curl http://localhost:3000/health
 # Swagger
 # Abra no navegador:
 # http://localhost:3000/api/docs
+
+
+## Auditoria — Proteção da `main`
+- [x] Pull Request obrigatório
+- [x] Status checks obrigatórios: lint, build, test (**strict: true**)
+- [x] Branch up-to-date exigida
+- [x] Enforce admins (sem bypass)
+- [x] 1 aprovação + dismiss stale + last push approval
+- [x] Conversation resolution + linear history
+- [ ] CODEOWNERS ativo (arquivo presente)
+- [ ] Require review from Code Owners habilitado
+### Evidências anexadas
+- Screenshot das regras de Branch Protection
+- Link de PR com “All checks have passed” (lint/build/test)
+- Execução do workflow CI (link dos jobs)
