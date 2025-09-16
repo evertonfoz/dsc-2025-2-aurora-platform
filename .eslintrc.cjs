@@ -4,17 +4,17 @@ module.exports = {
   env: { node: true, es2023: true, jest: true },
   parser: '@typescript-eslint/parser',
   parserOptions: {
+    // 🔧 use APENAS o tsconfig de lint
     project: ['./tsconfig.eslint.json'],
-    tsconfigRootDir: __dirname,
-    // opcional, melhora performance quando project é usado
-    projectService: true
+    tsconfigRootDir: __dirname
+    // remova estas linhas se existirem:
+    // projectService: true,
+    // allowDefaultProject: true
   },
   plugins: ['@typescript-eslint', 'prettier'],
   extends: [
-    // usa regras com type-check; requer parserOptions.project
     'plugin:@typescript-eslint/recommended-type-checked',
     'plugin:@typescript-eslint/stylistic-type-checked',
-    // integra o prettier e desativa conflitos
     'plugin:prettier/recommended'
   ],
   overrides: [
@@ -22,13 +22,12 @@ module.exports = {
       files: ['**/*.spec.ts', '**/*.e2e-spec.ts', 'test/**/*.ts', 'tests/**/*.ts'],
       env: { jest: true, node: true },
       rules: {
-        // flexibiliza nos testes (evita falsos positivos que já vimos)
-        '@typescript-eslint/no-unsafe-assignment': 'off',
-        '@typescript-eslint/no-unsafe-argument': 'off',
-        '@typescript-eslint/no-unsafe-call': 'off',
-        '@typescript-eslint/no-unsafe-member-access': 'off',
-        '@typescript-eslint/no-unsafe-return': 'off',
-        '@typescript-eslint/no-explicit-any': 'off'
+        '@typescript-eslint/no-unsafe-assignment': 'warn',
+        '@typescript-eslint/no-unsafe-argument': 'warn',
+        '@typescript-eslint/no-unsafe-call': 'warn',
+        '@typescript-eslint/no-unsafe-member-access': 'warn',
+        '@typescript-eslint/no-unsafe-return': 'warn',
+        '@typescript-eslint/no-explicit-any': 'warn'
       }
     }
   ],
