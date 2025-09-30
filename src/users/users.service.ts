@@ -13,7 +13,9 @@ import { PaginationQueryDto } from './dtos/pagination-query.dto';
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectRepository(User) private readonly repo: Repository<User>) {}
+  constructor(
+    @InjectRepository(User) private readonly repo: Repository<User>,
+  ) {}
 
   // util pra tirar o hash das respostas
   private stripSensitive(u: User) {
@@ -37,7 +39,7 @@ export class UsersService {
 
   async create(dto: CreateUserDto) {
     const email = this.normalizeEmail(dto.email);
-    const name  = this.normalizeName(dto.name);
+    const name = this.normalizeName(dto.name);
 
     // checagem preliminar (melhora UX), mas não substitui o tratamento do 23505
     const exists = await this.repo.findOne({ where: { email } });
@@ -57,7 +59,10 @@ export class UsersService {
       return this.stripSensitive(saved);
     } catch (err) {
       // condição de corrida: índice único de e-mail no banco
-      if (err instanceof QueryFailedError && (err as any).code === '23505') {
+      if (
+        err instanceof QueryFailedError &&
+        (err as QueryFailedError & { code: string }).code === '23505'
+      ) {
         throw new ConflictException('E-mail já registrado.');
       }
       throw err;
@@ -65,21 +70,22 @@ export class UsersService {
   }
 
   async findAll(query: PaginationQueryDto) {
-    const { page = 1, limit = 20, q, role, is_active } = query;
+    const { page = 1, limit = 20, q, role, isActive } = query;
 
     // saneamento
     const safePage = Number.isFinite(+page) && +page > 0 ? +page : 1;
     const rawLimit = Number.isFinite(+limit) ? +limit : 20;
     const safeLimit = Math.min(Math.max(rawLimit, 1), 100);
 
-    const where: any[] = [];
+    const where: Record<string, unknown>[] = [];
     if (q?.trim()) {
       where.push({ name: ILike(`%${q.trim()}%`) });
       where.push({ email: ILike(`%${q.trim()}%`) });
     }
 
     const roleCond = role ? { role } : {};
-    const activeCond = typeof is_active === 'boolean' ? { isActive: is_active } : {};
+    const activeCond =
+      typeof isActive === 'boolean' ? { isActive: isActive } : {};
     const whereClause =
       where.length > 0
         ? where.map((w) => ({ ...w, ...roleCond, ...activeCond }))

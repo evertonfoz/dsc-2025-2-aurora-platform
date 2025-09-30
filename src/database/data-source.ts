@@ -10,10 +10,10 @@ const common = {
   type: 'postgres' as const,
   entities: [__dirname + '/../**/*.entity.{ts,js}'],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
-  synchronize: false,       // nunca em prod
-  migrationsRun: false,     // rode pelos scripts
+  synchronize: false, // nunca em prod
+  migrationsRun: false, // rode pelos scripts
   logging: process.env.DB_LOGGING === 'true',
-  applicationName: 'aurora-users'
+  applicationName: 'aurora-users',
 };
 
 // SSL quando necessário (ex.: Supabase/Render/Heroku)
@@ -26,8 +26,8 @@ const sslOptions: TlsOptions | boolean | undefined =
 const options: PostgresConnectionOptions = process.env.DATABASE_URL
   ? {
       ...common,
-      url: process.env.DATABASE_URL!,   // usando URL completa
-      ssl: sslOptions
+      url: process.env.DATABASE_URL, // usando URL completa
+      ssl: sslOptions,
     }
   : {
       ...common,
@@ -36,7 +36,7 @@ const options: PostgresConnectionOptions = process.env.DATABASE_URL
       username: process.env.DB_USER!,
       password: process.env.DB_PASS!,
       database: process.env.DB_NAME!,
-      ssl: sslOptions
+      ssl: sslOptions,
     };
 
-export const AppDataSource = new DataSource(options); 
+export const AppDataSource = new DataSource(options);

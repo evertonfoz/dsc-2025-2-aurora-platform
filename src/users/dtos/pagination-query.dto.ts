@@ -17,7 +17,7 @@ export class PaginationQueryDto {
   @IsInt()
   @Min(1)
   @IsOptional()
-  page: number = 1;
+  page = 1;
 
   @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 20 })
   @Type(() => Number)
@@ -25,10 +25,10 @@ export class PaginationQueryDto {
   @Min(1)
   @Max(100)
   @IsOptional()
-  limit: number = 20;
+  limit = 20;
 
-  @ApiPropertyOptional({ description: 'Busca textual' })
-  @Transform(({ value }) =>
+  @ApiPropertyOptional({ description: 'Busca textual (name/email, ILIKE)' })
+  @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )
   @IsString()
@@ -40,16 +40,29 @@ export class PaginationQueryDto {
   @IsOptional()
   role?: UserRole;
 
-  @ApiPropertyOptional({ type: Boolean, description: 'Filtra por ativo/inativo' })
-  @Transform(({ value }) => {
-    if (value === undefined || value === null || value === '') return undefined;
-    if (typeof value === 'boolean') return value;
-    const v = String(value).toLowerCase();
-    if (['true', '1', 'yes', 'y'].includes(v)) return true;
-    if (['false', '0', 'no', 'n'].includes(v)) return false;
-    return value; // deixará falhar no @IsBoolean se vier inválido
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Filtra por ativo/inativo (aceita também ?is_active=...)',
   })
+  @Transform(
+    ({ value, obj }: { value: unknown; obj: Record<string, unknown> }) => {
+      // suporta ?isActive=... e o alias ?is_active=...
+      const raw = value ?? obj?.is_active;
+      if (raw === undefined || raw === null || raw === '') return undefined;
+      if (typeof raw === 'boolean') return raw;
+      const v =
+        typeof raw === 'string'
+          ? raw.toLowerCase()
+          : typeof raw === 'number' || typeof raw === 'boolean'
+            ? String(raw).toLowerCase()
+            : undefined;
+      if (!v) return undefined;
+      if (['true', '1', 'yes', 'y'].includes(v)) return true;
+      if (['false', '0', 'no', 'n'].includes(v)) return false;
+      return undefined;
+    },
+  )
   @IsBoolean()
   @IsOptional()
-  is_active?: boolean;
+  isActive?: boolean;
 }

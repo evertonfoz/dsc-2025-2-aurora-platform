@@ -8,20 +8,23 @@ import { APP_PIPE } from '@nestjs/core';
 import { UsersModule } from './users/users.module';
 
 @Module({
-  imports: [TypeOrmModule.forRoot(AppDataSource.options), UsersModule,
+  imports: [
+    TypeOrmModule.forRoot(AppDataSource.options),
+    UsersModule,
     // UsersModule
   ],
   controllers: [AppController],
   providers: [
     {
       provide: APP_PIPE,
-      useFactory: () => new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
+      useFactory: () =>
+        new ValidationPipe({
+          whitelist: true,
+          forbidNonWhitelisted: true,
+          transform: true,
+        }),
     },
     AppService,
   ],
 })
-export class AppModule { }
+export class AppModule {}
