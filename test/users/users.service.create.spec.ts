@@ -105,12 +105,7 @@ describe('UsersService – create', () => {
     repo.create.mockImplementation((d) => d);
     repo.save.mockImplementation((e) => Promise.resolve(e));
 
-    jest
-      .spyOn(
-        service as UsersService & { hash: (plain: string) => Promise<string> },
-        'hash',
-      )
-      .mockResolvedValue('hashed-123');
+    jest.spyOn(service as any, 'hash').mockResolvedValue('hashed-123');
 
     await service.create(makeDto({ role: UserRole.ADMIN }));
 
@@ -126,10 +121,7 @@ describe('UsersService – create', () => {
     repo.save.mockImplementation((e) => Promise.resolve(e));
 
     const hashSpy = jest
-      .spyOn(
-        service as UsersService & { hash: (plain: string) => Promise<string> },
-        'hash',
-      )
+      .spyOn(service as any, 'hash')
       .mockResolvedValue('hashed-123');
 
     await service.create(makeDto());
