@@ -224,7 +224,7 @@ describe('UsersService – findAll', () => {
       limit: 5,
       q: 'ana',
       role: UserRole.ADMIN,
-      is_active: true,
+      isActive: true,
     } as any);
 
     const [opts] = repo.findAndCount.mock.calls[0];
