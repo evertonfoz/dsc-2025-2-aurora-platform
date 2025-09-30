@@ -1,13 +1,12 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, Index,
-  CreateDateColumn, UpdateDateColumn
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  Index,
+  CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
-
-export enum UserRole {
-  STUDENT = 'student',
-  TEACHER = 'teacher',
-  ADMIN = 'admin',
-}
+import { UserRole } from '../domain/user-role.enum';
 
 @Entity({ name: 'users' })
 @Index(['email'], { unique: true })
@@ -39,3 +38,5 @@ export class User {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
 }
+
+export { UserRole };

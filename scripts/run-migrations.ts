@@ -1,15 +1,15 @@
-import ds from '../src/database/data-source';
+import { AppDataSource } from '../src/database/data-source';
 
 async function main() {
-  await ds.initialize();
+  await AppDataSource.initialize();
   console.log('[migrations] connected');
-  const res = await ds.runMigrations({ transaction: 'all' });
+  const res = await AppDataSource.runMigrations({ transaction: 'all' });
   for (const m of res) console.log('[migrations] applied:', m.name);
-  await ds.destroy();
+  await AppDataSource.destroy();
   console.log('[migrations] done');
 }
 main().catch(async (e) => {
   console.error('[migrations] error:', e);
-  try { await ds.destroy(); } catch {}
+  try { await AppDataSource.destroy(); } catch {}
   process.exit(1);
 });
