@@ -1,9 +1,9 @@
 // test/mocks/repository.mock.ts
 import { Repository, ObjectLiteral } from 'typeorm';
 
-// Mapeia cada método do tipo T para um jest.Mock
+// Mapeia cada método do tipo T para um jest.Mock mais flexível
 export type MockType<T> = {
-  [P in keyof T]: jest.Mock<unknown, unknown[]>;
+  [P in keyof T]: jest.Mock<any, any[]>;
 };
 
 // Fábrica de mock para Repository<Entity>
