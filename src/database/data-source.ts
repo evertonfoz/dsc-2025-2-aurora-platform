@@ -39,5 +39,4 @@ const options: PostgresConnectionOptions = process.env.DATABASE_URL
       ssl: sslOptions
     };
 
-export const AppDataSource = new DataSource(options);
-export default AppDataSource; 
+export const AppDataSource = new DataSource(options); 

@@ -16,5 +16,33 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    networks:
+      - aurora_network
+
+  app:
+    build: .
+    container_name: aurora_app
+    restart: unless-stopped
+    ports:
+      - '3001:3001'
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_NAME: aurora_users
+      DB_LOGGING: false
+      PORT: 3001
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - aurora_network
+
 volumes:
   pgdata:
+
+networks:
+  aurora_network:
+    driver: bridge
