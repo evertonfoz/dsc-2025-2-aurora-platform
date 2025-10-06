@@ -128,19 +128,4 @@ export class UsersController {
       limit,
     };
   }
-
-  // @Get(':id')
-  // findOne(@Param('id', ParseIntPipe) id: number) {
-  //   return this.users.findOne(id);
-  // }
-
-  // @Patch(':id')
-  // update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto) {
-  //   return this.users.update(id, dto);
-  // }
-
-  // @Delete(':id')
-  // remove(@Param('id', ParseIntPipe) id: number) {
-  //   return this.users.remove(id);
-  // }
 }
