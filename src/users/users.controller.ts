@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+  import { Body, Controller, Get, Post, Query, Param, NotFoundException, Put, Patch, Delete } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -10,20 +10,59 @@ import {
   ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
+  ApiNotFoundResponse,
 } from '@nestjs/swagger';
 import { plainToInstance } from 'class-transformer';
-
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dtos/create-user.dto';
+import { UpdateUserDto } from './dtos/update-user.dto';
 import { UserResponseDto } from './dtos/user-response.dto';
 import { PaginationQueryDto } from './dtos/pagination-query.dto';
 import { UserRole } from './domain/user-role.enum';
 import { PaginatedUsersResponseDto } from './dtos/paginated-users-response.dto';
 
+
+
 @ApiTags('Users')
 @Controller('users')
 export class UsersController {
   constructor(private readonly users: UsersService) {}
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Atualizar parcialmente usuário',
+    description: 'Atualiza parcialmente os dados de um usuário pelo ID.',
+  })
+  @ApiOkResponse({ description: 'Usuário atualizado.', type: UserResponseDto })
+  @ApiBadRequestResponse({ description: 'Payload ou ID inválido.' })
+  @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
+  async patch(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+  ): Promise<UserResponseDto> {
+    const user = await this.users.update(Number(id), dto);
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+    return plainToInstance(UserResponseDto, user, { excludeExtraneousValues: true });
+  }
+  @Put(':id')
+  @ApiOperation({
+    summary: 'Atualizar usuário (total)',
+    description: 'Atualiza todos os dados de um usuário pelo ID.',
+  })
+  @ApiOkResponse({ description: 'Usuário atualizado.', type: UserResponseDto })
+  @ApiBadRequestResponse({ description: 'Payload ou ID inválido.' })
+  @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+  ): Promise<UserResponseDto> {
+    const user = await this.users.update(Number(id), dto);
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+    return plainToInstance(UserResponseDto, user, { excludeExtraneousValues: true });
+  }
 
   @Post()
   @ApiOperation({
@@ -127,5 +166,39 @@ export class UsersController {
       page,
       limit,
     };
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Buscar usuário por ID',
+    description: 'Retorna os dados de um usuário específico pelo ID.',
+  })
+  @ApiOkResponse({
+    description: 'Usuário encontrado.',
+    type: UserResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'ID inválido.' })
+  @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
+  async findOne(@Param('id') id: string): Promise<UserResponseDto> {
+    const user = await this.users.findOne(Number(id));
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+    return plainToInstance(UserResponseDto, user, { excludeExtraneousValues: true });
+  }
+  @Delete(':id')
+  @ApiOperation({
+    summary: 'Remover (soft delete) usuário',
+    description: 'Marca o usuário como inativo (soft delete) pelo ID.',
+  })
+  @ApiOkResponse({ description: 'Usuário removido (inativado).', schema: { example: { success: true } } })
+  @ApiBadRequestResponse({ description: 'ID inválido.' })
+  @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
+  async remove(@Param('id') id: string): Promise<{ success: boolean }> {
+    const result = await this.users.remove(Number(id));
+    if (!result) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+    return { success: true };
   }
 }

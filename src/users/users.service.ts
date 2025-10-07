@@ -111,4 +111,27 @@ export class UsersService {
     if (!user) throw new NotFoundException('Usuário não encontrado.');
     return this.stripSensitive(user);
   }
+  async update(id: number, dto: Partial<CreateUserDto>) {
+    const user = await this.repo.findOne({ where: { id } });
+    if (!user) return undefined;
+
+    // Atualiza campos permitidos
+    if (dto.name !== undefined) user.name = this.normalizeName(dto.name);
+    if (dto.email !== undefined) user.email = this.normalizeEmail(dto.email);
+    if (dto.role !== undefined) user.role = dto.role;
+    if (dto.password !== undefined) {
+      const pepper = process.env.HASH_PEPPER ?? '';
+      user.passwordHash = await this.hash(dto.password + pepper);
+    }
+
+    const saved = await this.repo.save(user);
+    return this.stripSensitive(saved);
+  }
+  async remove(id: number) {
+    const user = await this.repo.findOne({ where: { id } });
+    if (!user) return undefined;
+    user.isActive = false;
+    const saved = await this.repo.save(user);
+    return this.stripSensitive(saved);
+  }
 }
