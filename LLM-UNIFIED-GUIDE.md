@@ -36,13 +36,76 @@ Este guia foi elaborado a partir de um fluxo real de desenvolvimento, desde o en
 - **Peça para criar branch, commit, push e PR**: Garanta rastreabilidade e revisão do trabalho.
 - **Exemplo**: "Crie uma branch docs/feature, faça commit, push e abra um PR para main."
 
-### 8. Checklist para Pedidos Eficientes
-- [ ] Pedido claro, objetivo e contextualizado
-- [ ] Tarefas divididas em etapas
-- [ ] Testes automatizados criados e executados
-- [ ] Documentação e relatórios gerados
-- [ ] Código revisado e validado
-- [ ] Versionamento e PR realizados
+
+
+### 8. Organize os Testes em Subpastas controllers/ e services/
+- Crie subpastas `controllers/` e `services/` dentro de `test/users/`.
+- Cada método principal deve ter seu próprio arquivo de teste, por exemplo:
+  - `test/users/services/users.service.create.spec.ts`
+  - `test/users/controllers/users.controller.findOne.spec.ts`
+- Ajuste os imports relativos conforme a estrutura de pastas.
+- Remova arquivos antigos/unificados após a migração para a estrutura modular.
+
+### 9. Boas Práticas para Testes
+- Sempre mocke métodos privados e dependências relevantes (ex: hash de senha).
+- Garanta que os testes reflitam o fluxo real do serviço, especialmente para métodos que envolvem lógica adicional (ex: hashing, normalização).
+- Após grandes mudanças de estrutura, rode todos os testes para garantir que tudo está funcionando.
+
+
+### 10. Workflow Obrigatório: Criação de Issue Antes de Qualquer Ação
+
+**NUNCA realize nenhuma ação (implementação, refatoração, teste, documentação, etc.) sem antes criar uma issue.**
+
+**Fluxo obrigatório:**
+1. Sempre solicite ao LLM: "Crie uma issue para esta demanda antes de qualquer coisa."
+2. A issue deve ser criada como um arquivo Markdown dentro de `docs/issues/`, com um nome descritivo e data.
+3. Após a issue criada, crie uma branch específica para ela (ex: `issue/2025-10-07-nome-da-issue`).
+4. Realize as alterações necessárias na branch.
+5. Faça commit das mudanças, referenciando a issue.
+6. Faça push da branch para o repositório remoto.
+7. Abra um Pull Request (PR) para a branch principal (`main`), mencionando a issue.
+8. Aguarde revisão e aprovação do PR antes de mergear.
+
+**Importante:**
+- Sempre peça explicitamente a criação da issue antes de qualquer ação.
+- Não avance para implementação, testes ou documentação sem a issue registrada.
+- Use o template de issue para descrever claramente o objetivo, contexto, critérios de aceite e data.
+
+#### Exemplo de template de issue (docs/issues/2025-10-07-exemplo.md):
+```markdown
+# Título da Issue
+
+**Data:** 07/10/2025
+
+## Descrição
+Descreva claramente o objetivo da demanda.
+
+## Contexto
+Explique o contexto do projeto e a motivação da tarefa.
+
+## Critérios de Aceite
+- [ ] Critério 1
+- [ ] Critério 2
+- [ ] ...
+
+## Observações
+Adicione informações relevantes, links ou anexos.
+```
+
+---
+
+### 11. Checklist para Pedidos Eficientes
+[ ] Pedido claro, objetivo e contextualizado
+[ ] Issue criada em docs/issues antes de qualquer ação
+[ ] Branch criada para a issue
+[ ] Tarefas divididas em etapas
+[ ] Testes automatizados criados e executados, organizados por método e pasta
+[ ] Documentação e relatórios gerados
+[ ] Código revisado e validado
+[ ] Versionamento e PR realizados
+[ ] Estrutura de testes modular e limpa
+[ ] Imports relativos revisados
+[ ] Arquivos antigos removidos após migração
 
 ---
 
