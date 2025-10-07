@@ -111,42 +111,4 @@ export class UsersService {
     if (!user) throw new NotFoundException('Usuário não encontrado.');
     return this.stripSensitive(user);
   }
-
-  // async update(id: number, dto: UpdateUserDto) {
-  //   const user = await this.repo.findOne({ where: { id } });
-  //   if (!user) throw new NotFoundException('Usuário não encontrado.');
-
-  //   // se for atualizar email, garanta unicidade
-  //   if (dto.email && dto.email !== user.email) {
-  //     const emailInUse = await this.repo.findOne({
-  //       where: { email: dto.email },
-  //     });
-  //     if (emailInUse) throw new ConflictException('E-mail já registrado.');
-  //   }
-
-  //   // password opcional no UpdateUserDto
-  //   let passwordHash: string | undefined;
-  //   if ((dto as any).password) {
-  //     passwordHash = await this.hash((dto as any).password);
-  //   }
-
-  //   Object.assign(user, {
-  //     name: dto.name ?? user.name,
-  //     email: dto.email ?? user.email,
-  //     role: dto.role ?? user.role,
-  //     isActive: dto.isActive ?? user.isActive,
-  //     avatarUrl: dto.avatarUrl ?? user.avatarUrl,
-  //     ...(passwordHash ? { passwordHash } : {}),
-  //   });
-
-  //   const saved = await this.repo.save(user);
-  //   return this.stripSensitive(saved);
-  // }
-
-  // async remove(id: number) {
-  //   const user = await this.repo.findOne({ where: { id } });
-  //   if (!user) throw new NotFoundException('Usuário não encontrado.');
-  //   await this.repo.remove(user);
-  //   return { deleted: true };
-  // }
 }
