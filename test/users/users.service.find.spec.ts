@@ -67,8 +67,8 @@ describe('UsersService – findAll', () => {
     // tolerante a implementação:
     expect(
       opts.where === undefined ||
-        Array.isArray(opts.where) ||
-        typeof opts.where === 'object',
+      Array.isArray(opts.where) ||
+      typeof opts.where === 'object',
     ).toBe(true);
 
     // contrato de retorno
@@ -235,6 +235,42 @@ describe('UsersService – findAll', () => {
       expect(branch.role).toBe(UserRole.ADMIN);
       expect(branch.isActive).toBe(true);
     }
+  });
+
+  it('deve aplicar q (OR em name/email), role, is_active e paginação customizada', async () => {
+    const rows: User[] = [];
+    (repo.findAndCount as jest.Mock).mockResolvedValue([rows, 0]);
+
+    await service.findAll({
+      page: 2,
+      limit: 10,
+      q: 'ana',
+      role: UserRole.ADMIN,
+      isActive: false,
+    } as any);
+
+    const [opts] = (repo.findAndCount as jest.Mock).mock.calls[0];
+
+    // paginação
+    expect(opts.skip).toBe(10); // (2-1)*10
+    expect(opts.take).toBe(10);
+
+    // where deve ser OR (array) com role/isActive aplicados em cada branch
+    expect(Array.isArray(opts.where)).toBe(true);
+    expect(opts.where).toHaveLength(2);
+
+    const [w0, w1] = opts.where as any[];
+    // branch 1: name ILike + role + isActive
+    expect(w0.role).toBe(UserRole.ADMIN);
+    expect(w0.isActive).toBe(false);
+    expect(w0.name.value).toBe('%ana%');           // ILike
+    expect(w0.name.type?.toLowerCase?.()).toBe('ilike');
+
+    // branch 2: email ILike + role + isActive
+    expect(w1.role).toBe(UserRole.ADMIN);
+    expect(w1.isActive).toBe(false);
+    expect(w1.email.value).toBe('%ana%');          // ILike
+    expect(w1.email.type?.toLowerCase?.()).toBe('ilike');
   });
 
   it('deve sanear page/limit fora dos limites (page<1 → 1; limit>100 → 100; limit<1 → 1)', async () => {
