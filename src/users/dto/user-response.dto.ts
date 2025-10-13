@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude, Expose } from 'class-transformer';
-import { UserRole } from '../domain/user-role.enum';
+import { UserRole } from '../enums/user-role.enum';
 
 // Use @Exclude no topo e exponha campo a campo
 @Exclude()

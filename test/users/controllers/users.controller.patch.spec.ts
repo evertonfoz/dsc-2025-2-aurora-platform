@@ -2,7 +2,7 @@
 import { Test } from '@nestjs/testing';
 import { UsersController } from '../../../src/users/users.controller';
 import { UsersService } from '../../../src/users/users.service';
-import { UserRole } from '../../../src/users/domain/user-role.enum';
+import { UserRole } from '../../../src/users/enums/user-role.enum';
 describe('UsersController – patch', () => {
   let controller: UsersController;
   const service = { update: jest.fn() };

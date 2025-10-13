@@ -9,7 +9,7 @@ import {
   IsBoolean,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { UserRole } from '../domain/user-role.enum';
+import { UserRole } from '../enums/user-role.enum';
 
 export class PaginationQueryDto {
   @ApiPropertyOptional({ minimum: 1, default: 1 })
