@@ -36,6 +36,17 @@ import { PaginatedUsersResponseDto } from './dto/paginated-users-response.dto';
 @Controller('users')
 export class UsersController {
   constructor(private readonly users: UsersService) {}
+  /*
+   Example usage of Roles decorator and RolesGuard:
+   import { UseGuards } from '@nestjs/common';
+   import { Roles } from '../common/decorators/roles.decorator';
+   import { RolesGuard } from '../common/guards/roles.guard';
+
+   // @UseGuards(RolesGuard)
+   // @Roles('admin')
+   // @Delete(':id')
+   // async adminRemove(@Param('id') id: string) { ... }
+  */
   @Patch(':id')
   @ApiOperation({
     summary: 'Atualizar parcialmente usuário',
