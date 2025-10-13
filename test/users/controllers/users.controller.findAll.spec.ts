@@ -3,7 +3,6 @@ import { Test } from '@nestjs/testing';
 import { UsersController } from '../../../src/users/users.controller';
 import { UsersService } from '../../../src/users/users.service';
 import { UserRole } from '../../../src/users/domain/user-role.enum';
-import { PaginationQueryDto } from '../../../src/users/dtos/pagination-query.dto';
 describe('UsersController – findAll', () => {
   let controller: UsersController;
   const service = { findAll: jest.fn() };
@@ -31,7 +30,7 @@ describe('UsersController – findAll', () => {
       page: 2,
       limit: 5,
     });
-    const res = await controller.findAll(query as PaginationQueryDto);
+    const res = await controller.findAll(query as any);
     expect(service.findAll).toHaveBeenCalledWith(query);
     expect(res).toEqual({ data: [], total: 0, page: 2, limit: 5 });
   });
