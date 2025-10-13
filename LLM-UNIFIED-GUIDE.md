@@ -114,6 +114,19 @@ Adicione informações relevantes, links ou anexos.
 - **Peça explicações e exemplos sempre que necessário**.
 - **Use o Copilot Chat como parceiro ativo, não apenas executor.**
 
+### Uso de MCP Context7 (recomendado)
+
+- Para obter documentação atualizada e exemplos oficiais de bibliotecas críticas do projeto (por exemplo: NestJS, TypeORM, class-transformer, class-validator, RxJS, Jest, ESLint), consulte o servidor MCP Context7 antes de implementar mudanças não triviais.
+- Fluxo recomendado ao usar MCP Context7:
+  1. Resolver o identificador da biblioteca (p.ex. `nest.js` ou `/vercel/next.js`) usando a API do MCP Context7.
+  2. Recuperar a documentação e trechos relevantes (hooks, exemplos de configuração, breaking changes).
+  3. Aplicar mudanças pequenas e seguras com base nas recomendações e citar a fonte no PR.
+
+### Verificação obrigatória de AGENTS.md
+
+- Antes de iniciar qualquer tarefa, abra e leia `AGENTS.md` para conferir instruções rápidas do time humano e proceder conforme o fluxo indicado.
+
+
 Seguindo este guia, suas interações com LLMs serão mais produtivas, assertivas e alinhadas com as melhores práticas de desenvolvimento colaborativo.
 
 ---

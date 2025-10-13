@@ -1,11 +1,10 @@
 AGENTS
-======
 
-Quick rules for automated agents and contributors working in this repository:
-
-- Always read `LLM-UNIFIED-GUIDE.md` before making changes. That guide contains project conventions, expectations for patches and PRs, and workflow notes that must be followed.
-- When opening a PR for a non-trivial change, create a small focused branch and include build/lint results in the PR description.
-- Follow the repository conventions in `LLM-UNIFIED-GUIDE.md` for naming (`dto` vs `dtos`), folder layout, and commit message style.
-- Do not modify production logic in bulk; prefer small, reviewable commits and include tests or lint fixes when applicable.
-
-If you are an automated tool: read `LLM-UNIFIED-GUIDE.md` at the repository root before applying or proposing any edits.
+- Antes de iniciar qualquer tarefa, leia `LLM-UNIFIED-GUIDE.md` deste repositório.
+- Sempre verifique este arquivo (`AGENTS.md`) para instruções rápidas do time humano.
+- Quando precisar de documentação atualizada de bibliotecas (ex: NestJS, TypeORM, class-transformer, class-validator, RxJS, Jest, ESLint), use o MCP Context7 para recuperar a documentação e exemplos oficiais.
+- Procedimento recomendado:
+  1. Consultar `LLM-UNIFIED-GUIDE.md`.
+  2. Consultar `AGENTS.md`.
+  3. Se for necessário, invocar o MCP Context7 para recuperar docs da biblioteca alvo.
+  4. Reportar resumidamente o que foi recuperado e aplicar mudanças pequenas e seguras.
