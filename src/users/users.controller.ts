@@ -1,4 +1,15 @@
-  import { Body, Controller, Get, Post, Query, Param, NotFoundException, Put, Patch, Delete } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Param,
+  NotFoundException,
+  Put,
+  Patch,
+  Delete,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -21,8 +32,6 @@ import { PaginationQueryDto } from './dtos/pagination-query.dto';
 import { UserRole } from './domain/user-role.enum';
 import { PaginatedUsersResponseDto } from './dtos/paginated-users-response.dto';
 
-
-
 @ApiTags('Users')
 @Controller('users')
 export class UsersController {
@@ -43,7 +52,9 @@ export class UsersController {
     if (!user) {
       throw new NotFoundException('Usuário não encontrado.');
     }
-    return plainToInstance(UserResponseDto, user, { excludeExtraneousValues: true });
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
   }
   @Put(':id')
   @ApiOperation({
@@ -61,7 +72,9 @@ export class UsersController {
     if (!user) {
       throw new NotFoundException('Usuário não encontrado.');
     }
-    return plainToInstance(UserResponseDto, user, { excludeExtraneousValues: true });
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Post()
@@ -184,14 +197,19 @@ export class UsersController {
     if (!user) {
       throw new NotFoundException('Usuário não encontrado.');
     }
-    return plainToInstance(UserResponseDto, user, { excludeExtraneousValues: true });
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
   }
   @Delete(':id')
   @ApiOperation({
     summary: 'Remover (soft delete) usuário',
     description: 'Marca o usuário como inativo (soft delete) pelo ID.',
   })
-  @ApiOkResponse({ description: 'Usuário removido (inativado).', schema: { example: { success: true } } })
+  @ApiOkResponse({
+    description: 'Usuário removido (inativado).',
+    schema: { example: { success: true } },
+  })
   @ApiBadRequestResponse({ description: 'ID inválido.' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
   async remove(@Param('id') id: string): Promise<{ success: boolean }> {

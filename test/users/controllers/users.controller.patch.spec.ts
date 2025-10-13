@@ -41,7 +41,9 @@ describe('UsersController – patch', () => {
 
   it('PATCH /users/:id → lança NotFoundException se usuário não existe', async () => {
     service.update.mockResolvedValue(undefined);
-    await expect(controller.patch('999', {} as any)).rejects.toThrow('Usuário não encontrado.');
+    await expect(controller.patch('999', {} as any)).rejects.toThrow(
+      'Usuário não encontrado.',
+    );
     expect(service.update).toHaveBeenCalledWith(999, {});
   });
 });

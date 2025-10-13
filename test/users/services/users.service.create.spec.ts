@@ -50,7 +50,9 @@ describe('UsersService', () => {
       const saved = { ...entity, id: 1 };
       repository.findOne.mockResolvedValue(null);
       // mocka o hash da senha
-      jest.spyOn<any, any>(service as any, 'hash').mockResolvedValue('hashed-password');
+      jest
+        .spyOn<any, any>(service as any, 'hash')
+        .mockResolvedValue('hashed-password');
       repository.create.mockReturnValue(entity);
       repository.save.mockResolvedValue(saved);
 
