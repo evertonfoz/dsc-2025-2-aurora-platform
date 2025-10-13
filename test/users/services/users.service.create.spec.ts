@@ -51,7 +51,7 @@ describe('UsersService', () => {
       repository.findOne.mockResolvedValue(null);
       // mocka o hash da senha
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      jest.spyOn(service as any, 'hash').mockResolvedValue('hashed-password');
+      jest.spyOn(service, 'hash' as any).mockResolvedValue('hashed-password');
       repository.create.mockReturnValue(entity);
       repository.save.mockResolvedValue(saved);
 

@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { UsersController } from '../../../src/users/users.controller';
 import { UsersService } from '../../../src/users/users.service';
 import { UserRole } from '../../../src/users/domain/user-role.enum';
+import { UpdateUserDto } from '../../../src/users/dtos/update-user.dto';
 describe('UsersController – update', () => {
   let controller: UsersController;
   const service = { update: jest.fn() };
@@ -33,7 +34,7 @@ describe('UsersController – update', () => {
       updatedAt: new Date(),
     };
     service.update.mockResolvedValue(updatedUser);
-    const res = await controller.update('7', updateDto as any);
+    const res = await controller.update('7', updateDto as UpdateUserDto);
     expect(service.update).toHaveBeenCalledWith(7, updateDto);
     expect(res).toMatchObject({
       id: 7,
@@ -46,7 +47,7 @@ describe('UsersController – update', () => {
 
   it('PUT /users/:id → lança NotFoundException se usuário não existe', async () => {
     service.update.mockResolvedValue(undefined);
-    await expect(controller.update('999', {} as any)).rejects.toThrow(
+    await expect(controller.update('999', {} as UpdateUserDto)).rejects.toThrow(
       'Usuário não encontrado.',
     );
     expect(service.update).toHaveBeenCalledWith(999, {});

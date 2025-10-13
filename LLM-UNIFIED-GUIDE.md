@@ -115,3 +115,49 @@ Adicione informações relevantes, links ou anexos.
 - **Use o Copilot Chat como parceiro ativo, não apenas executor.**
 
 Seguindo este guia, suas interações com LLMs serão mais produtivas, assertivas e alinhadas com as melhores práticas de desenvolvimento colaborativo.
+
+---
+
+## Prevenção de erros comuns de lint e testes ao gerar código/tests
+
+Quando geramos código automaticamente (especialmente testes), alguns padrões frequentes podem disparar erros do ESLint ou falhas de tipagem em TypeScript. Abaixo há práticas recomendadas e exemplos que devem ser seguidos pelo LLM ao gerar código para este repositório.
+
+- Evitar imports não usados
+  - Problema: imports ou variáveis declaradas e não usadas geram erros `no-unused-vars`.
+  - Recomendações:
+    - Só importe o que será realmente usado no arquivo de teste/implementação.
+    - Se o LLM gerar um bloco de imports, valide e remova os que não são usados.
+
+- Evitar casts genéricos `as any`
+  - Problema: `as any` contorna o sistema de tipos e gera avisos `no-explicit-any` e `no-unsafe-argument`.
+  - Recomendações:
+    - Importe e use os DTOs e tipos reais (ex: `CreateUserDto`, `UpdateUserDto`, `PaginationQueryDto`) nos testes para tipar as entradas corretamente.
+    - Quando necessário mockar objetos, crie objetos com a forma exata esperada pelo método (mesmo que seja parcial), e use tipos como `Partial<T>` para marcar parcialmente preenchidos.
+  - Exemplo:
+    - Bom: `await controller.create(body as CreateUserDto)` (com `CreateUserDto` importado)
+    - Melhor: tipar `const body: CreateUserDto = { ... }` e usar `await controller.create(body)`
+
+- Evitar acessos inseguros em valores `any`
+  - Problema: `no-unsafe-member-access` quando se faz `(result as any).passwordHash`.
+  - Recomendações:
+    - Use `as unknown as Partial<Entity>` ou declare `const resultUser = result as Partial<User>` para acesso seguro a propriedades em asserts.
+
+- Mocks e typings para repositórios/serviços
+  - Problema: factories de mocks do TypeORM com tipagem incorreta causam erros de compilação (tipo 'never' ou propriedades faltantes) ou warnings `no-explicit-any`.
+  - Recomendações:
+    - Defina uma factory de mock reutilizável (ex.: `test/mocks/repository.mock.ts`) que exponha apenas os métodos usados nos testes e que seja tipada como `MockType<Repository<Entity>>`.
+    - É aceitável (e comum) usar `jest.Mock<any, any[]>` para os mocks, envolver a definição com `/* eslint-disable @typescript-eslint/no-explicit-any */` localmente e documentar o motivo no arquivo.
+
+- spyOn e métodos privados/protected
+  - Problema: ao mockar métodos internos (ex: `hash`), a tipagem pode exigir conversões que disparam `no-explicit-any`.
+  - Recomendações:
+    - Sempre prefira tornar o teste agressivo em relação ao comportamento esperado (testar efeitos observáveis) em vez de mockar implantações internas. Quando for necessário, use um `// eslint-disable-next-line @typescript-eslint/no-explicit-any` apenas na linha do spy e documente no teste.
+
+- Regras práticas para o LLM gerar testes e código:
+  1. Sempre verificar as importações e remover as não usadas.
+  2. Preferir tipos concretos (DTOs/Entities) ao invés de `any`.
+  3. Ao criar mocks, usar `repositoryMockFactory()` centralizada em `test/mocks/`.
+  4. Evitar alterar regras do ESLint globalmente; usar `// eslint-disable-next-line` apenas quando for realmente necessário e documentar por que.
+  5. Rodar `npm run lint` e `npm test` após alterações geradas pelo LLM e somente avançar se ambos passarem.
+
+Colocar estas regras no fluxo de geração de código reduzirá regressões por lint/test e facilitará a revisão humana das mudanças.
