@@ -12,12 +12,13 @@ export function IsTrimmed(validationOptions?: ValidationOptions) {
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate(value: unknown, _args: ValidationArguments) {
+        validate(value: unknown, args: ValidationArguments) {
           if (typeof value !== 'string') return true; // let other validators handle type
           return value === value.trim();
         },
         defaultMessage(args: ValidationArguments) {
-          return `${args.property} should not have leading or trailing whitespace`;
+          // use args to avoid unused-variable lint
+          return `${String(args.property)} should not have leading or trailing whitespace`;
         },
       },
     });
