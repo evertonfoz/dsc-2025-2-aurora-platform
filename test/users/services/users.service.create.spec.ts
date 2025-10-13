@@ -6,7 +6,7 @@ import { repositoryMockFactory, MockType } from '../../mocks/repository.mock';
 import { User } from '../../../src/users/entities/user.entity';
 import { UsersService } from '../../../src/users/users.service';
 import { UserRole } from '../../../src/users/domain/user-role.enum';
-import { CreateUserDto } from '../../../src/users/dtos/create-user.dto';
+import { CreateUserDto } from '../../../src/users/dto/create-user.dto';
 
 describe('UsersService', () => {
   let service: UsersService;
