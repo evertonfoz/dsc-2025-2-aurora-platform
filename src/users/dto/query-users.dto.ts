@@ -1,1 +1,10 @@
-import { UserRole } from '../enums/user-role.enum';\n\nexport class QueryUsersDto {\n  page?: number; // default 1\n  limit?: number; // default 20, max. 100\n  name?: string;\n  email?: string;\n  role?: UserRole;\n  isActive?: boolean;\n}\n
+import { UserRole } from '../enums/user-role.enum';
+
+export class QueryUsersDto {
+  page?: number; // default 1
+  limit?: number; // default 20, max. 100
+  name?: string;
+  email?: string;
+  role?: UserRole;
+  isActive?: boolean;
+}
