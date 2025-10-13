@@ -7,15 +7,20 @@ import {
   MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { UserRole } from '../domain/user-role.enum';
+import { Transform } from 'class-transformer';
+import { IsTrimmed } from '../../common/validators/is-trimmed.validator';
+import { ToLowerCase } from '../../common/validators/to-lowercase.transform';
+import { UserRole } from '../enums/user-role.enum';
 
 export class CreateUserDto {
   @ApiProperty({ minLength: 2, maxLength: 120 })
   @IsString()
+  @IsTrimmed()
   @Length(2, 120)
   name!: string;
 
   @ApiProperty({ format: 'email' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
   @IsEmail()
   email!: string;
 
