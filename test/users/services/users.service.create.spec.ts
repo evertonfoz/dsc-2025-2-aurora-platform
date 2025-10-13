@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository, QueryFailedError } from 'typeorm';
+import { Repository } from 'typeorm';
 import { ConflictException } from '@nestjs/common';
 import { repositoryMockFactory, MockType } from '../../mocks/repository.mock';
 import { User } from '../../../src/users/entities/user.entity';
@@ -50,7 +50,8 @@ describe('UsersService', () => {
       const saved = { ...entity, id: 1 };
       repository.findOne.mockResolvedValue(null);
       // mocka o hash da senha
-      jest.spyOn<any, any>(service as any, 'hash').mockResolvedValue('hashed-password');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      jest.spyOn(service as any, 'hash').mockResolvedValue('hashed-password');
       repository.create.mockReturnValue(entity);
       repository.save.mockResolvedValue(saved);
 
@@ -64,7 +65,7 @@ describe('UsersService', () => {
         email: 'test@test.com',
         role: UserRole.STUDENT,
       });
-      expect((result as any).passwordHash).toBeUndefined();
+      expect((result as unknown as Partial<User>).passwordHash).toBeUndefined();
     });
 
     it('should throw a conflict exception if the user already exists', async () => {
