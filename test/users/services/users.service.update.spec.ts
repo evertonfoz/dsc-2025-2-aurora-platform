@@ -4,7 +4,6 @@ import { Repository } from 'typeorm';
 import { repositoryMockFactory, MockType } from '../../mocks/repository.mock';
 import { User } from '../../../src/users/entities/user.entity';
 import { UsersService } from '../../../src/users/users.service';
-import { UserRole } from '../../../src/users/domain/user-role.enum';
 describe('UsersService', () => {
   let service: UsersService;
   let repositoryMock: MockType<Repository<User>>;

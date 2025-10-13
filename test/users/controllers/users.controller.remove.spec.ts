@@ -24,7 +24,9 @@ describe('UsersController – remove', () => {
 
   it('DELETE /users/:id → lança NotFoundException se usuário não existe', async () => {
     service.remove.mockResolvedValue(false);
-    await expect(controller.remove('999')).rejects.toThrow('Usuário não encontrado.');
+    await expect(controller.remove('999')).rejects.toThrow(
+      'Usuário não encontrado.',
+    );
     expect(service.remove).toHaveBeenCalledWith(999);
   });
 });

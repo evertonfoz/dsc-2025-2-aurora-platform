@@ -42,7 +42,9 @@ describe('UsersController – findOne', () => {
 
   it('GET /users/:id → lança NotFoundException se usuário não existe', async () => {
     service.findOne.mockResolvedValue(undefined);
-    await expect(controller.findOne('999')).rejects.toThrow('Usuário não encontrado.');
+    await expect(controller.findOne('999')).rejects.toThrow(
+      'Usuário não encontrado.',
+    );
     expect(service.findOne).toHaveBeenCalledWith(999);
   });
 });
