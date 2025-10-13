@@ -8,7 +8,7 @@ import { ILike, QueryFailedError, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UserRole } from './domain/user-role.enum';
+import { UserRole } from './enums/user-role.enum';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
 
 @Injectable()

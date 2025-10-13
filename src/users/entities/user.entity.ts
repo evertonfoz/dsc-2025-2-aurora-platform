@@ -6,7 +6,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { UserRole } from '../domain/user-role.enum';
+import { UserRole } from '../enums/user-role.enum';
 
 @Entity({ name: 'users' })
 @Index(['email'], { unique: true })

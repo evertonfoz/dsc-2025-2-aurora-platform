@@ -29,7 +29,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
-import { UserRole } from './domain/user-role.enum';
+import { UserRole } from './enums/user-role.enum';
 import { PaginatedUsersResponseDto } from './dto/paginated-users-response.dto';
 
 @ApiTags('Users')
