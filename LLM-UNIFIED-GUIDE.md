@@ -185,6 +185,7 @@ Colocar estas regras no fluxo de geração de código reduzirá regressões por 
 - **Acesso ao Banco**: Use `docker-compose exec db psql -U postgres -d aurora_users` para conectar via psql dentro do container. Não assuma que ferramentas como `psql` estão instaladas localmente.
 - **Migrations**: Execute via `npx typeorm-ts-node-commonjs -d src/database/data-source.ts <command>`. Garanta que o container do banco esteja rodando antes.
 - **Testes**: Use `npm run test` para unit + e2e. Em DEV, o `JwtAuthGuard` injeta usuário fake.
+- **Gerenciamento de Dependências**: Se ocorrer erro de permissões no cache npm (arquivos root-owned), execute `sudo chown -R $(whoami) ~/.npm` seguido de `npm cache clean --force` e `npm install` para regenerar package-lock.json.
 
 ## Leituras recomendadas
 
