@@ -5,9 +5,9 @@ interface User {
 }
 
 export const OwnerId = createParamDecorator(
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment */
   (data: unknown, ctx: ExecutionContext): number => {
     const request = ctx.switchToHttp().getRequest();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const user = (request as { user?: User }).user;
     return user?.sub ?? 0;
   },

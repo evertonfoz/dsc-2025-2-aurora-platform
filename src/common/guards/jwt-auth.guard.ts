@@ -1,10 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 
-interface User {
-  sub: number;
-  isAdmin: boolean;
-}
-
 /**
  * Placeholder JWT guard.
  *
@@ -15,11 +10,11 @@ interface User {
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
   canActivate(context: ExecutionContext): boolean {
     // In DEV, inject fake user
     if (process.env.NODE_ENV !== 'production') {
       const request = context.switchToHttp().getRequest();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       request.user = { sub: 1, isAdmin: true };
     }
     // Implement JWT validation here or use `@nestjs/passport` AuthGuard('jwt')
