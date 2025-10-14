@@ -39,12 +39,13 @@ describe('Events (e2e)', () => {
 
     expect(response.body).toHaveProperty('id');
     expect(response.body).toHaveProperty('slug');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(response.body.state).toBe('draft');
   });
 
   it('GET /events does not list draft events', async () => {
     // First create a draft event
-    const createResponse = await request(server)
+    await request(server)
       .post('/events')
       .send({
         title: 'Draft Event',
@@ -54,8 +55,6 @@ describe('Events (e2e)', () => {
         endsAt: '2025-12-01T12:00:00Z',
       })
       .expect(201);
-
-    const draftId = createResponse.body.id;
 
     // Now GET /events should not include it
     const listResponse = await request(server)
