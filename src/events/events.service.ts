@@ -1,11 +1,51 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Event, EventState, EventVisibility } from './entities/event.entity';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 
 @Injectable()
 export class EventsService {
-  async create(createEventDto: CreateEventDto, ownerUserId: number) {
-    // TODO: implement
+  constructor(
+    @InjectRepository(Event)
+    private readonly eventRepository: Repository<Event>,
+  ) {}
+
+  async create(createEventDto: CreateEventDto, ownerUserId: number): Promise<Event> {
+    // Validate dates
+    const startsAt = new Date(createEventDto.startsAt);
+    const endsAt = new Date(createEventDto.endsAt);
+    if (endsAt <= startsAt) {
+      throw new BadRequestException('endsAt must be after startsAt');
+    }
+
+    // Validate registration dates if provided
+    if (createEventDto.registrationOpensAt && createEventDto.registrationClosesAt) {
+      const opensAt = new Date(createEventDto.registrationOpensAt);
+      const closesAt = new Date(createEventDto.registrationClosesAt);
+      if (closesAt <= opensAt || opensAt < startsAt || closesAt > endsAt) {
+        throw new BadRequestException('Invalid registration dates');
+      }
+    }
+
+    // Generate slug
+    let slug = createEventDto.slug || this.normalizeSlug(createEventDto.title);
+    slug = await this.ensureUniqueSlug(slug);
+
+    const event = this.eventRepository.create({
+      ...createEventDto,
+      startsAt,
+      endsAt,
+      registrationOpensAt: createEventDto.registrationOpensAt ? new Date(createEventDto.registrationOpensAt) : undefined,
+      registrationClosesAt: createEventDto.registrationClosesAt ? new Date(createEventDto.registrationClosesAt) : undefined,
+      slug,
+      state: EventState.DRAFT,
+      visibility: createEventDto.visibility ?? EventVisibility.PUBLIC,
+      ownerUserId,
+    });
+
+    return this.eventRepository.save(event);
   }
 
   async findAll(query: {
@@ -17,18 +57,148 @@ export class EventsService {
     page: number;
     limit: number;
   }) {
-    // TODO: implement
+    const qb = this.eventRepository.createQueryBuilder('event');
+
+    // Filters
+    if (query.q) {
+      qb.andWhere('(event.title ILIKE :q OR event.summary ILIKE :q)', { q: `%${query.q}%` });
+    }
+    if (query.from) {
+      qb.andWhere('event.startsAt >= :from', { from: new Date(query.from) });
+    }
+    if (query.to) {
+      qb.andWhere('event.startsAt <= :to', { to: new Date(query.to) });
+    }
+    if (query.visibility) {
+      qb.andWhere('event.visibility = :visibility', { visibility: query.visibility });
+    } else {
+      qb.andWhere('event.visibility = :visibility', { visibility: EventVisibility.PUBLIC });
+    }
+    if (query.state) {
+      qb.andWhere('event.state = :state', { state: query.state });
+    } else {
+      qb.andWhere('event.state = :state', { state: EventState.PUBLISHED });
+    }
+
+    // Pagination
+    qb.skip((query.page - 1) * query.limit).take(query.limit);
+
+    // Order by startsAt
+    qb.orderBy('event.startsAt', 'ASC');
+
+    const [events, total] = await qb.getManyAndCount();
+    return { events, total, page: query.page, limit: query.limit };
   }
 
-  async findOneByIdOrSlug(idOrSlug: number | string) {
-    // TODO: implement
+  async findOneByIdOrSlug(idOrSlug: number | string, requester?: { id: number; isAdmin: boolean }): Promise<Event> {
+    const qb = this.eventRepository.createQueryBuilder('event');
+    if (typeof idOrSlug === 'number') {
+      qb.where('event.id = :id', { id: idOrSlug });
+    } else {
+      qb.where('event.slug = :slug', { slug: idOrSlug });
+    }
+
+    const event = await qb.getOne();
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    // Check visibility
+    if (event.state !== EventState.PUBLISHED) {
+      if (!requester || (requester.id !== event.ownerUserId && !requester.isAdmin)) {
+        throw new ForbiddenException('Access denied');
+      }
+    }
+
+    return event;
   }
 
-  async update(id: number, updateEventDto: UpdateEventDto, ownerUserId: number) {
-    // TODO: implement
+  async update(id: number, updateEventDto: UpdateEventDto, requester: { id: number; isAdmin: boolean }): Promise<Event> {
+    const event = await this.eventRepository.findOneBy({ id });
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    // Check ownership/admin
+    if (requester.id !== event.ownerUserId && !requester.isAdmin) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    // Validate dates if updating
+    let startsAt = event.startsAt;
+    let endsAt = event.endsAt;
+    if (updateEventDto.startsAt) {
+      startsAt = new Date(updateEventDto.startsAt);
+    }
+    if (updateEventDto.endsAt) {
+      endsAt = new Date(updateEventDto.endsAt);
+    }
+    if (endsAt <= startsAt) {
+      throw new BadRequestException('endsAt must be after startsAt');
+    }
+
+    // Update slug if provided
+    let slug = event.slug;
+    if (updateEventDto.slug) {
+      slug = await this.ensureUniqueSlug(updateEventDto.slug, id);
+    }
+
+    // Update fields
+    Object.assign(event, {
+      ...updateEventDto,
+      startsAt,
+      endsAt,
+      registrationOpensAt: updateEventDto.registrationOpensAt ? new Date(updateEventDto.registrationOpensAt) : event.registrationOpensAt,
+      registrationClosesAt: updateEventDto.registrationClosesAt ? new Date(updateEventDto.registrationClosesAt) : event.registrationClosesAt,
+      slug,
+    });
+
+    return this.eventRepository.save(event);
   }
 
-  async publish(id: number, ownerUserId: number) {
-    // TODO: implement
+  async publish(id: number, requester: { id: number; isAdmin: boolean }): Promise<Event> {
+    const event = await this.eventRepository.findOneBy({ id });
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    // Check ownership/admin
+    if (requester.id !== event.ownerUserId && !requester.isAdmin) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    // Check valid transition
+    if (event.state !== EventState.DRAFT && event.state !== EventState.ARCHIVED) {
+      throw new BadRequestException('Can only publish draft or archived events');
+    }
+
+    event.state = EventState.PUBLISHED;
+    return this.eventRepository.save(event);
+  }
+
+  private normalizeSlug(title: string): string {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '') // remove special chars
+      .replace(/\s+/g, '-') // replace spaces with -
+      .replace(/-+/g, '-') // replace multiple - with single
+      .trim();
+  }
+
+  private async ensureUniqueSlug(baseSlug: string, excludeId?: number): Promise<string> {
+    let slug = baseSlug;
+    let counter = 1;
+    while (true) {
+      const existing = await this.eventRepository.findOne({
+        where: { slug },
+        select: ['id'],
+      });
+      if (!existing || existing.id === excludeId) {
+        break;
+      }
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+    return slug;
   }
 }

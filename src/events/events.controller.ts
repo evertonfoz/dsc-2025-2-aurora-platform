@@ -45,11 +45,11 @@ export class EventsController {
 
   @Patch(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() updateEventDto: UpdateEventDto, @OwnerId() ownerUserId: number) {
-    return this.eventsService.update(id, updateEventDto, ownerUserId);
+    return this.eventsService.update(id, updateEventDto, { id: ownerUserId, isAdmin: false });
   }
 
   @Post(':id/publish')
   publish(@Param('id', ParseIntPipe) id: number, @OwnerId() ownerUserId: number) {
-    return this.eventsService.publish(id, ownerUserId);
+    return this.eventsService.publish(id, { id: ownerUserId, isAdmin: false });
   }
 }
