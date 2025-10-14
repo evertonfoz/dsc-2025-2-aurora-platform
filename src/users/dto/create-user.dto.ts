@@ -3,6 +3,7 @@ import {
   IsEnum,
   IsOptional,
   IsString,
+  IsStrongPassword,
   Length,
   MinLength,
 } from 'class-validator';
@@ -26,7 +27,7 @@ export class CreateUserDto {
 
   @ApiProperty({ minLength: 6 })
   @IsString()
-  @MinLength(6) // <- use MinLength em vez de Length(6) para não exigir exatamente 6
+  @IsStrongPassword() 
   password!: string;
 
   @ApiPropertyOptional({ enum: UserRole, enumName: 'UserRole' })
