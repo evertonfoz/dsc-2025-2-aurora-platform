@@ -19,6 +19,7 @@ export class JwtAuthGuard implements CanActivate {
     // In DEV, inject fake user
     if (process.env.NODE_ENV !== 'production') {
       const request = context.switchToHttp().getRequest();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       (request as { user: User }).user = { sub: 1, isAdmin: true };
     }
     // Implement JWT validation here or use `@nestjs/passport` AuthGuard('jwt')

@@ -10,7 +10,7 @@ import { UsersHttpClient } from './users-http.client';
   imports: [
     TypeOrmModule.forFeature([RefreshToken]),
     JwtModule.register({
-      secret: process.env.JWT_ACCESS_SECRET || 'dev_access_secret',
+      secret: process.env.JWT_ACCESS_SECRET ?? 'dev_access_secret',
       signOptions: { expiresIn: 900 },
     }),
   ],
