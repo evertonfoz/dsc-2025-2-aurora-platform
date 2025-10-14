@@ -18,7 +18,7 @@ export function IsTrimmed(validationOptions?: ValidationOptions) {
         },
         defaultMessage(args: ValidationArguments) {
           // use args to avoid unused-variable lint
-          return `${String(args.property)} should not have leading or trailing whitespace`;
+          return `${String(args.property)} não deve conter espaços em branco no início ou no fim`;
         },
       },
     });

@@ -174,3 +174,7 @@ Quando geramos código automaticamente (especialmente testes), alguns padrões f
   5. Rodar `npm run lint` e `npm test` após alterações geradas pelo LLM e somente avançar se ambos passarem.
 
 Colocar estas regras no fluxo de geração de código reduzirá regressões por lint/test e facilitará a revisão humana das mudanças.
+
+## Leituras recomendadas
+
+- Estratégia para índices e colunas de texto (citext): `docs/citext-index-strategy.md`

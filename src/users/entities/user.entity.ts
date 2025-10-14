@@ -9,7 +9,6 @@ import {
 import { UserRole } from '../enums/user-role.enum';
 
 @Entity({ name: 'users' })
-@Index(['email'], { unique: true })
 export class User {
   @PrimaryGeneratedColumn({ type: 'integer', name: 'id' })
   id!: number;
@@ -17,6 +16,7 @@ export class User {
   @Column({ type: 'varchar', length: 120 })
   name!: string;
 
+  @Index('idx_users_email_unique', ['email'], { unique: true })
   @Column({ type: 'citext' })
   email!: string;
 
