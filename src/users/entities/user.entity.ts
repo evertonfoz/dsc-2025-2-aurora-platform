@@ -17,7 +17,7 @@ export class User {
   @Column({ type: 'varchar', length: 120 })
   name!: string;
 
-  @Column({ type: 'varchar', length: 160 })
+  @Column({ type: 'citext', length: 160 })
   email!: string;
 
   @Column({ name: 'password_hash', type: 'varchar', length: 255 })
