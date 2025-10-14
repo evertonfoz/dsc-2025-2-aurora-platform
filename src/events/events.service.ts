@@ -6,7 +6,9 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Event, EventState, EventVisibility } from './entities/event.entity';
+import { Event } from './entities/event.entity';
+import { EventState } from './enums/event-state.enum';
+import { EventVisibility } from './enums/event-visibility.enum';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { toSlug } from './utils/slug.util';

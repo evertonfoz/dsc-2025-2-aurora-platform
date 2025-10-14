@@ -6,17 +6,8 @@ import {
   UpdateDateColumn,
   Index,
 } from 'typeorm';
-
-export enum EventState {
-  DRAFT = 'draft',
-  PUBLISHED = 'published',
-  ARCHIVED = 'archived',
-}
-
-export enum EventVisibility {
-  PUBLIC = 'public',
-  PRIVATE = 'private',
-}
+import { EventState } from '../enums/event-state.enum';
+import { EventVisibility } from '../enums/event-visibility.enum';
 
 @Entity()
 @Index(['slug'], { unique: true })

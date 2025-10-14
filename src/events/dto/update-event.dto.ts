@@ -8,7 +8,7 @@ import {
   IsEnum,
   IsUrl,
 } from 'class-validator';
-import { EventVisibility } from '../entities/event.entity';
+import { EventVisibility } from '../enums/event-visibility.enum';
 
 export class UpdateEventDto {
   @IsOptional()

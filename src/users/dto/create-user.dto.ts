@@ -2,7 +2,7 @@ import { IsEmail, IsEnum, IsOptional, IsString, Length } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsTrimmed } from '../../common/validators/is-trimmed.validator';
-import { ToLowerTransform } from '../../common/validators/to-lowercase.transform';
+import { ToLowerTransform } from '../../common/transformers/to-lowercase.transform';
 import { IsStrongPassword } from '../../common/validators/is-strong-password.validator';
 import { UserRole } from '../enums/user-role.enum';
 
