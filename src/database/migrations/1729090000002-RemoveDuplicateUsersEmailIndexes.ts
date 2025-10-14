@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class RemoveDuplicateUsersEmailIndexes1729090000002 implements MigrationInterface {
+export class RemoveDuplicateUsersEmailIndexes1729090000002
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Create the named index if it doesn't exist
     await queryRunner.query(`DO $$ BEGIN
@@ -12,8 +14,12 @@ export class RemoveDuplicateUsersEmailIndexes1729090000002 implements MigrationI
     END$$;`);
 
     // Ensure idx_users_email_unique exists (create as constraint to keep consistent naming)
-    await queryRunner.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS idx_users_email_unique;`);
-    await queryRunner.query(`ALTER TABLE users ADD CONSTRAINT IF NOT EXISTS idx_users_email_unique UNIQUE (email);`);
+    await queryRunner.query(
+      `ALTER TABLE users DROP CONSTRAINT IF EXISTS idx_users_email_unique;`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE users ADD CONSTRAINT IF NOT EXISTS idx_users_email_unique UNIQUE (email);`,
+    );
 
     // Drop any other UNIQUE indexes on users(email) except the one we want
     await queryRunner.query(`DO $$
@@ -33,7 +39,11 @@ export class RemoveDuplicateUsersEmailIndexes1729090000002 implements MigrationI
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Recreate a generic users_email_key constraint and remove the named idx
-    await queryRunner.query(`ALTER TABLE IF EXISTS users DROP CONSTRAINT IF EXISTS idx_users_email_unique;`);
-    await queryRunner.query(`ALTER TABLE users ADD CONSTRAINT IF NOT EXISTS users_email_key UNIQUE (email);`);
+    await queryRunner.query(
+      `ALTER TABLE IF EXISTS users DROP CONSTRAINT IF EXISTS idx_users_email_unique;`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE users ADD CONSTRAINT IF NOT EXISTS users_email_key UNIQUE (email);`,
+    );
   }
 }

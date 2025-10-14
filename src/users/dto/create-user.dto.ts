@@ -1,16 +1,9 @@
-import {
-  IsEmail,
-  IsEnum,
-  IsOptional,
-  IsString,
-  IsStrongPassword,
-  Length,
-  MinLength,
-} from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString, Length } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsTrimmed } from '../../common/validators/is-trimmed.validator';
 import { ToLowerTransform } from '../../common/validators/to-lowercase.transform';
+import { IsStrongPassword } from '../../common/validators/is-strong-password.validator';
 import { UserRole } from '../enums/user-role.enum';
 
 export class CreateUserDto {
@@ -27,7 +20,7 @@ export class CreateUserDto {
 
   @ApiProperty({ minLength: 6 })
   @IsString()
-  @IsStrongPassword() 
+  @IsStrongPassword()
   password!: string;
 
   @ApiPropertyOptional({ enum: UserRole, enumName: 'UserRole' })
