@@ -2,13 +2,10 @@ import { registerDecorator, ValidationOptions } from 'class-validator';
 
 export function IsStrongPassword(options?: ValidationOptions) {
   // object must have a constructor property (the target class constructor)
-  return function (
-    object: { constructor: new (...args: unknown[]) => unknown },
-    propertyName: string,
-  ) {
+  return function (object: Object, propertyName: string) {
     registerDecorator({
       name: 'IsStrongPassword',
-      target: object.constructor,
+      target: object.constructor as any,
       propertyName,
       options,
       validator: {
