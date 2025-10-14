@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Event, EventState, EventVisibility } from './entities/event.entity';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
+import { toSlug } from './utils/slug.util';
 
 @Injectable()
 export class EventsService {
@@ -30,7 +31,7 @@ export class EventsService {
     }
 
     // Generate slug
-    let slug = createEventDto.slug || this.normalizeSlug(createEventDto.title);
+    let slug = createEventDto.slug || toSlug(createEventDto.title);
     slug = await this.ensureUniqueSlug(slug);
 
     const event = this.eventRepository.create({
@@ -174,15 +175,6 @@ export class EventsService {
 
     event.state = EventState.PUBLISHED;
     return this.eventRepository.save(event);
-  }
-
-  private normalizeSlug(title: string): string {
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '') // remove special chars
-      .replace(/\s+/g, '-') // replace spaces with -
-      .replace(/-+/g, '-') // replace multiple - with single
-      .trim();
   }
 
   private async ensureUniqueSlug(baseSlug: string, excludeId?: number): Promise<string> {
