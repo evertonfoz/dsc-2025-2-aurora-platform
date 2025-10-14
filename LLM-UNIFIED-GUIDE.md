@@ -179,6 +179,13 @@ Colocar estas regras no fluxo de geração de código reduzirá regressões por 
 
 - **Diretórios de DTOs**: Sempre use `dto` (singular) em vez de `dtos` (plural) para diretórios contendo Data Transfer Objects. Exemplo: `src/users/dto/` ao invés de `src/users/dtos/`.
 
+## Ambiente de Desenvolvimento
+
+- **Banco de Dados**: PostgreSQL rodando em Docker Compose (container `aurora_db`).
+- **Acesso ao Banco**: Use `docker-compose exec db psql -U postgres -d aurora_users` para conectar via psql dentro do container. Não assuma que ferramentas como `psql` estão instaladas localmente.
+- **Migrations**: Execute via `npx typeorm-ts-node-commonjs -d src/database/data-source.ts <command>`. Garanta que o container do banco esteja rodando antes.
+- **Testes**: Use `npm run test` para unit + e2e. Em DEV, o `JwtAuthGuard` injeta usuário fake.
+
 ## Leituras recomendadas
 
 - Estratégia para índices e colunas de texto (citext): `docs/citext-index-strategy.md`
