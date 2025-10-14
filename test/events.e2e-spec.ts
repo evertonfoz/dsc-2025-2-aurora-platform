@@ -41,6 +41,9 @@ describe('Events (e2e)', () => {
     expect(response.body).toHaveProperty('slug');
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(response.body.state).toBe('draft');
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const eventId = response.body.id;
   });
 
   it('GET /events does not list draft events', async () => {

@@ -31,6 +31,7 @@ export class EventsService {
     }
 
     // Generate slug
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     let slug = createEventDto.slug || toSlug(createEventDto.title);
     slug = await this.ensureUniqueSlug(slug);
 
