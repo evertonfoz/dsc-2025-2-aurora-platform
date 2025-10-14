@@ -6,11 +6,15 @@ import { AppDataSource } from './database/data-source';
 // import { UsersModule } from './users/users.module';
 import { APP_PIPE } from '@nestjs/core';
 import { UsersModule } from './users/users.module';
+import { EventsModule } from './events/events.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
     TypeOrmModule.forRoot(AppDataSource.options),
     UsersModule,
+    EventsModule,
+    AuthModule,
     // UsersModule
   ],
   controllers: [AppController],

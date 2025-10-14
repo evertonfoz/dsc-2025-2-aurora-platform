@@ -10,10 +10,14 @@ import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  canActivate(_context: ExecutionContext): boolean {
+  /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+  canActivate(context: ExecutionContext): boolean {
+    // In DEV, inject fake user
+    if (process.env.NODE_ENV !== 'production') {
+      const request = context.switchToHttp().getRequest();
+      request.user = { sub: 1, isAdmin: true };
+    }
     // Implement JWT validation here or use `@nestjs/passport` AuthGuard('jwt')
-    // Mark _context as used for linting purposes.
-    void _context;
     // Returning true for now as a placeholder.
     return true;
   }

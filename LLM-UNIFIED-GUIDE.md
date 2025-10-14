@@ -155,6 +155,22 @@ Quando geramos código automaticamente (especialmente testes), alguns padrões f
   - Recomendações:
     - Use `as unknown as Partial<Entity>` ou declare `const resultUser = result as Partial<User>` para acesso seguro a propriedades em asserts.
 
+- Preferir `??` sobre `||` para defaults
+  - Problema: `||` trata valores falsy (como 0, false, '') como falsos, o que pode levar a bugs. `??` só trata null/undefined.
+  - Recomendações:
+    - Sempre use `??` para defaults, especialmente em guards, decorators e validações.
+  - Exemplo:
+    - Ruim: `return user?.sub || 0;` (se sub for 0, retorna 0 incorretamente)
+    - Bom: `return user?.sub ?? 0;`
+
+- Tratamento de request.user em decorators e guards
+  - Problema: `request.user` é tipado como `any` no Express, causando `no-unsafe-assignment` e `no-unsafe-member-access`.
+  - Recomendações:
+    - Defina interfaces locais para User (ex: `interface User { sub: number; }`).
+    - Use casts como `const user = (request as { user?: User }).user;`.
+    - Para placeholders em DEV (ex: injeção de usuário fake), use `// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access` e documente como placeholder.
+    - Evite `as any` direto; prefira casts específicos.
+
 - Mocks e typings para repositórios/serviços
   - Problema: factories de mocks do TypeORM com tipagem incorreta causam erros de compilação (tipo 'never' ou propriedades faltantes) ou warnings `no-explicit-any`.
   - Recomendações:
@@ -174,6 +190,18 @@ Quando geramos código automaticamente (especialmente testes), alguns padrões f
   5. Rodar `npm run lint` e `npm test` após alterações geradas pelo LLM e somente avançar se ambos passarem.
 
 Colocar estas regras no fluxo de geração de código reduzirá regressões por lint/test e facilitará a revisão humana das mudanças.
+
+## Convenções de Nomenclatura
+
+- **Diretórios de DTOs**: Sempre use `dto` (singular) em vez de `dtos` (plural) para diretórios contendo Data Transfer Objects. Exemplo: `src/users/dto/` ao invés de `src/users/dtos/`.
+
+## Ambiente de Desenvolvimento
+
+- **Banco de Dados**: PostgreSQL rodando em Docker Compose (container `aurora_db`).
+- **Acesso ao Banco**: Use `docker-compose exec db psql -U postgres -d aurora_users` para conectar via psql dentro do container. Não assuma que ferramentas como `psql` estão instaladas localmente.
+- **Migrations**: Execute via `npx typeorm-ts-node-commonjs -d src/database/data-source.ts <command>`. Garanta que o container do banco esteja rodando antes.
+- **Testes**: Use `npm run test` para unit + e2e. Em DEV, o `JwtAuthGuard` injeta usuário fake.
+- **Gerenciamento de Dependências**: Se ocorrer erro de permissões no cache npm (arquivos root-owned), execute `sudo chown -R $(whoami) ~/.npm` seguido de `npm cache clean --force` e `npm install` para regenerar package-lock.json.
 
 ## Leituras recomendadas
 
