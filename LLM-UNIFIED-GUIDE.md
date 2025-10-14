@@ -175,6 +175,10 @@ Quando geramos código automaticamente (especialmente testes), alguns padrões f
 
 Colocar estas regras no fluxo de geração de código reduzirá regressões por lint/test e facilitará a revisão humana das mudanças.
 
+## Convenções de Nomenclatura
+
+- **Diretórios de DTOs**: Sempre use `dto` (singular) em vez de `dtos` (plural) para diretórios contendo Data Transfer Objects. Exemplo: `src/users/dto/` ao invés de `src/users/dtos/`.
+
 ## Leituras recomendadas
 
 - Estratégia para índices e colunas de texto (citext): `docs/citext-index-strategy.md`
