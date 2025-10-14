@@ -1,4 +1,13 @@
-import { IsString, Length, IsISO8601, IsOptional, IsInt, Min, IsEnum, IsUrl } from 'class-validator';
+import {
+  IsString,
+  Length,
+  IsISO8601,
+  IsOptional,
+  IsInt,
+  Min,
+  IsEnum,
+  IsUrl,
+} from 'class-validator';
 import { EventVisibility } from '../entities/event.entity';
 
 export class CreateEventDto {

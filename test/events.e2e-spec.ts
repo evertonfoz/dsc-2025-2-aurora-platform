@@ -57,9 +57,7 @@ describe('Events (e2e)', () => {
       .expect(201);
 
     // Now GET /events should not include it
-    const listResponse = await request(server)
-      .get('/events')
-      .expect(200);
+    const listResponse = await request(server).get('/events').expect(200);
 
     expect(listResponse.body.events).toEqual([]);
   });
@@ -80,14 +78,10 @@ describe('Events (e2e)', () => {
     const eventId = createResponse.body.id;
 
     // Publish it
-    await request(server)
-      .post(`/events/${eventId}/publish`)
-      .expect(200);
+    await request(server).post(`/events/${eventId}/publish`).expect(200);
 
     // Now GET /events should list it
-    const listResponse = await request(server)
-      .get('/events')
-      .expect(200);
+    const listResponse = await request(server).get('/events').expect(200);
 
     expect(listResponse.body.events).toHaveLength(1);
     expect(listResponse.body.events[0].id).toBe(eventId);
@@ -111,9 +105,7 @@ describe('Events (e2e)', () => {
     const eventSlug = createResponse.body.slug;
 
     // Publish
-    await request(server)
-      .post(`/events/${eventId}/publish`)
-      .expect(200);
+    await request(server).post(`/events/${eventId}/publish`).expect(200);
 
     // GET by slug
     const getResponse = await request(server)

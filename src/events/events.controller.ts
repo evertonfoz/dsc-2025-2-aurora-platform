@@ -1,4 +1,14 @@
-import { Controller, Post, Get, Patch, Param, Query, Body, ParseIntPipe, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Param,
+  Query,
+  Body,
+  ParseIntPipe,
+  UseGuards,
+} from '@nestjs/common';
 import { EventsService } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
@@ -11,7 +21,10 @@ export class EventsController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  create(@Body() createEventDto: CreateEventDto, @OwnerId() ownerUserId: number) {
+  create(
+    @Body() createEventDto: CreateEventDto,
+    @OwnerId() ownerUserId: number,
+  ) {
     return this.eventsService.create(createEventDto, ownerUserId);
   }
 
@@ -47,13 +60,23 @@ export class EventsController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
-  update(@Param('id', ParseIntPipe) id: number, @Body() updateEventDto: UpdateEventDto, @OwnerId() ownerUserId: number) {
-    return this.eventsService.update(id, updateEventDto, { id: ownerUserId, isAdmin: false });
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateEventDto: UpdateEventDto,
+    @OwnerId() ownerUserId: number,
+  ) {
+    return this.eventsService.update(id, updateEventDto, {
+      id: ownerUserId,
+      isAdmin: false,
+    });
   }
 
   @Post(':id/publish')
   @UseGuards(JwtAuthGuard)
-  publish(@Param('id', ParseIntPipe) id: number, @OwnerId() ownerUserId: number) {
+  publish(
+    @Param('id', ParseIntPipe) id: number,
+    @OwnerId() ownerUserId: number,
+  ) {
     return this.eventsService.publish(id, { id: ownerUserId, isAdmin: false });
   }
 }

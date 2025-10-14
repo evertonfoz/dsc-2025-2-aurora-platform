@@ -56,7 +56,9 @@ export class CreateEventsTable1760000000000 implements MigrationInterface {
     await queryRunner.query(`DROP INDEX "IDX_events_starts_at"`);
 
     // Drop constraint
-    await queryRunner.query(`ALTER TABLE "events" DROP CONSTRAINT "UQ_events_slug"`);
+    await queryRunner.query(
+      `ALTER TABLE "events" DROP CONSTRAINT "UQ_events_slug"`,
+    );
 
     // Drop table
     await queryRunner.query(`DROP TABLE "events"`);

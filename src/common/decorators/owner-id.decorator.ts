@@ -7,8 +7,8 @@ interface User {
 export const OwnerId = createParamDecorator(
   (data: unknown, ctx: ExecutionContext): number => {
     const request = ctx.switchToHttp().getRequest();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    const user = request.user as User | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const user = (request as { user?: User }).user;
     return user?.sub ?? 0;
   },
 );
