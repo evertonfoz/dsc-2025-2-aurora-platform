@@ -1,21 +1,22 @@
 ### Environment variables
 # Define these variables at the top so your HTTP client (VSCode REST Client, Thunder Client, etc.) can resolve them.
-@host = http://localhost:3000
+@host = http://localhost:3001
+@apiBase = {{host}}/v1
 @userId = 1
 @token = 
 
 ### List users
-GET {{host}}/users
+GET {{apiBase}}/users
 Accept: application/json
 Authorization: Bearer {{token}}
 
 ### Get user by id
-GET {{host}}/users/{{userId}}
+GET {{apiBase}}/users/{{userId}}
 Accept: application/json
 Authorization: Bearer {{token}}
 
 ### Create user
-POST {{host}}/users
+POST {{apiBase}}/users
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
@@ -27,7 +28,7 @@ Authorization: Bearer {{token}}
 }
 
 ### Update user (partial)
-PATCH {{host}}/users/{{userId}}
+PATCH {{apiBase}}/users/{{userId}}
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
@@ -36,7 +37,7 @@ Authorization: Bearer {{token}}
 }
 
 ### Replace user
-PUT {{host}}/users/{{userId}}
+PUT {{apiBase}}/users/{{userId}}
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
@@ -48,9 +49,10 @@ Authorization: Bearer {{token}}
 }
 
 ### Delete user
-DELETE {{host}}/users/{{userId}}
+DELETE {{apiBase}}/users/{{userId}}
 Authorization: Bearer {{token}}
 
 # Notes
 # - Set `@token` to a valid JWT or leave empty for unsecured local testing.
 # - Adjust `@host` if your server runs on a different port or host.
+# - By default requests now target `{{apiBase}}` which is `{{host}}/v1`.
