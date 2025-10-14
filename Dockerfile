@@ -20,10 +20,10 @@ COPY . .
 RUN npm run build
 
 # Dar permissão de execução ao script
-RUN chmod +x start.sh
+RUN chmod +x scripts/start.sh
 
 # Expor porta da aplicação
 EXPOSE 3001
 
 # Comando para iniciar a aplicação com migrações
-CMD ["./start.sh"]
+CMD ["./scripts/start.sh"]
