@@ -6,6 +6,7 @@ export class RemoveDuplicateUsersEmailIndexes1729090000002
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Only perform index/constraint operations if users table exists
     await queryRunner.query(`DO $$
+    DECLARE r RECORD;
     BEGIN
       IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users') THEN
         -- Ensure idx_users_email_unique exists
@@ -15,7 +16,7 @@ export class RemoveDuplicateUsersEmailIndexes1729090000002
         END IF;
 
         -- Drop any other UNIQUE indexes on users(email) except the one we want
-        DECLARE r RECORD;
+        -- Declare loop variable in the PL/pgSQL declaration section
         FOR r IN
           SELECT indexname FROM pg_indexes
           WHERE tablename = 'users'
@@ -32,6 +33,7 @@ export class RemoveDuplicateUsersEmailIndexes1729090000002
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Remove the named index if it exists and recreate generic constraint only if users exists
     await queryRunner.query(`DO $$
+    DECLARE r RECORD;
     BEGIN
       IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users') THEN
         EXECUTE 'DROP INDEX IF EXISTS idx_users_email_unique';
