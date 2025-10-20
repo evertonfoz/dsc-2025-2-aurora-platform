@@ -189,6 +189,62 @@ Quando geramos código automaticamente (especialmente testes), alguns padrões f
   4. Evitar alterar regras do ESLint globalmente; usar `// eslint-disable-next-line` apenas quando for realmente necessário e documentar por que.
   5. Rodar `npm run lint` e `npm test` após alterações geradas pelo LLM e somente avançar se ambos passarem.
 
+### Regras obrigatórias e checklist final (instruções práticas para o LLM)
+
+Ao gerar código (especialmente testes) para este repositório, o LLM deve seguir obrigatoriamente as regras abaixo e incluir um pequeno checklist no corpo do PR indicando que cada item foi verificado:
+
+- Uso de imports e dotenv
+  - Nunca usar `require('dotenv').config()` dentro de arquivos TypeScript. Use um import compatível com TS, por exemplo:
+    - `import dotenv from 'dotenv'; dotenv.config();`
+    - ou `import 'dotenv/config';` (quando apropriado)
+  - Remova `require()` em arquivos `.ts` — isso dispara a regra `no-require` do ESLint.
+
+- Defaults de variáveis de ambiente
+  - Use `??` (nullish coalescing) para valores padrão de `process.env` — nunca `||`. Exemplo:
+    - Ruim: `process.env.DB_HOST || 'localhost'`
+    - Bom: `process.env.DB_HOST ?? 'localhost'`
+
+- Tipagem e `any`
+  - Evitar `any` em testes e produção. Sempre importar e usar DTOs/Tipos reais.
+  - Quando for necessário um mock parcial, use `Partial<T>`:
+    - `const body: Partial<CreateUserDto> = { email: 'x@x.com' }`
+  - Se for inevitável um cast, prefira casts específicos: `as unknown as Partial<User>` ao invés de `as any`.
+
+- Acessos inseguros e asserts
+  - Evitar tocar propriedades de objetos sem tipagem. Use casts localizados:
+    - `const resultUser = result as Partial<User>` antes de acessar `resultUser.passwordHash`.
+
+- Mocks e factories
+  - Centralize mocks em `test/mocks/` (p.ex. `repository.mock.ts`) e exporte `MockType<Repository<T>>` para reuso.
+
+- Testes que usam DB (smoke/integration)
+  - Testes que dependem de Postgres devem residir em `test/smoke/` ou `test/integration/`.
+  - Garanta que o teste fecha o módulo de Nest: `await moduleRef.close();` para evitar open handles no Jest.
+  - Não use `synchronize: true` em ambientes que refletem produção; prefira executar migrations previamente para validar schema.
+
+- Uso de `eslint-disable` e exceções
+  - `// eslint-disable-next-line` só pode ser usado com justificativa em linha acima e curta explicação do motivo.
+  - Preferir corrigir o código em vez de desabilitar regras.
+
+- Execução e validação local antes do PR
+  - Antes de abrir PR, executar sequence:
+    1. `npm run lint` — não deve haver erros (warnings são aceitáveis, porém preferível corrigi-los).
+    2. `npm test` — todos os testes relevantes devem passar. Tests que dependem de infra devem ser executados separadamente depois de subir serviços (ex: docker-compose up -d db).
+  - Incluir no corpo do PR um checklist com os comandos executados e seus resultados.
+
+### Exemplo de checklist para a descrição do PR
+
+```
+- [x] Rodei `npm run lint` — sem erros
+- [x] Rodei `npm test` — todos os testes unitários passaram
+- [x] Para smoke tests dependentes de DB: subi `docker compose up -d db` e rodei `npm run test -- test/smoke` — passou
+- [x] Removi imports não usados e evitei `any`
+- [x] Não usei `require()` em arquivos TypeScript
+```
+
+Adicionar este checklist ao `LLM-UNIFIED-GUIDE.md` como uma verificação obrigatória instruirá os LLMs e contributors humanos a seguirem o fluxo e evitar regressões de lint/typings no CI.
+
+
 Colocar estas regras no fluxo de geração de código reduzirá regressões por lint/test e facilitará a revisão humana das mudanças.
 
 ## Convenções de Nomenclatura
