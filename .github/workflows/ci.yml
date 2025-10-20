@@ -185,14 +185,17 @@ jobs:
             echo "Waiting for postgres... ($i/60)"
             sleep 1
           done
-      - name: Run migrations
+      - name: Run migrations (verbose)
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           DB_USER: postgres
           DB_PASS: postgres
           DB_NAME: aurora_users
-        run: npm run migration:run
+          DEBUG: typeorm:*
+        run: |
+          set -x
+          npm run migration:run
       - name: Run smoke tests
         env:
           DB_HOST: 127.0.0.1
