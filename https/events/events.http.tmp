@@ -1,0 +1,44 @@
+### Environment variables
+# Define these variables at the top so your HTTP client can resolve them.
+@host = http://localhost:3001
+@apiBase = {{host}}/v1
+@eventId = 1
+@token = 
+
+### Get all Events
+GET {{apiBase}}/events
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Create Event (without slug)
+POST {{apiBase}}/events
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Sample Event",
+  "summary": "This is a sample event summary",
+  "description": "Detailed description of the sample event",
+  "startsAt": "2025-12-01T10:00:00Z",
+  "endsAt": "2025-12-01T12:00:00Z",
+  "visibility": "public"
+}
+
+### Publish Event
+POST {{apiBase}}/events/{{eventId}}/publish
+Authorization: Bearer {{token}}
+
+### List Published Events with filters
+GET {{apiBase}}/events?q=sample&from=2025-12-01T00:00:00Z&to=2025-12-31T23:59:59Z&page=1&limit=10
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Get Event by Slug
+GET {{apiBase}}/events/sample-event
+Accept: application/json
+Authorization: Bearer {{token}}
+
+# Notes
+# - Set `@token` to a valid JWT or leave empty for unsecured local testing.
+# - `@apiBase` includes `/v1` since many endpoints are versioned under `/v1`.
+# - Adjust `@host` if your server runs on a different port or host.
