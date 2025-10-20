@@ -195,7 +195,16 @@ jobs:
           DEBUG: typeorm:*
         run: |
           set -x
-          npm run migration:run
+          # Capture stdout/stderr to migration.log and fail loudly with contents on error
+          npm run migration:run 2>&1 | tee migration.log || (cat migration.log && exit 1)
+          # Also print the log for successful runs
+          cat migration.log || true
+      - name: Upload migration log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-log
+          path: migration.log
       - name: Run smoke tests
         env:
           DB_HOST: 127.0.0.1
