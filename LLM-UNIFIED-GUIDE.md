@@ -206,3 +206,26 @@ Colocar estas regras no fluxo de geração de código reduzirá regressões por 
 ## Leituras recomendadas
 
 - Estratégia para índices e colunas de texto (citext): `docs/citext-index-strategy.md`
+
+### HTTP example files and template
+
+- Store HTTP examples under the `https/` folder and keep one template file named `https/http-template.http`.
+- Template variables to use at the top of HTTP files:
+  - `@host` — base host (e.g. `http://localhost:3001`).
+  - `@apiBase` — base API including version, e.g. `{{host}}/v1`.
+  - `@token` — bearer token for Authorization header (leave empty for local testing).
+  - `@resourceId` / `@eventId` — default ids used in example requests.
+
+- Example pattern at the top of each HTTP file:
+
+```
+@host = http://localhost:3001
+@apiBase = {{host}}/v1
+@token = 
+@resourceId = 1
+```
+
+- Always use `{{apiBase}}` (not hard-coded `/v1`) so API versioning is explicit and easy to update.
+- Include `Accept: application/json` and `Authorization: Bearer {{token}}` headers where appropriate.
+
+Add the `https/http-template.http` to new feature branches when creating new HTTP examples and document the usage in the PR body so reviewers can validate the requests quickly.
