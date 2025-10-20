@@ -1,0 +1,37 @@
+### HTTP Request Template
+# Copy this template when creating new HTTP example files.
+# Variables to define at the top:
+# - @host: base host (e.g. http://localhost:3001)
+# - @apiBase: API base including version (e.g. {{host}}/v1)
+# - @token: Bearer token if needed
+# - @resourceId: default resource id for examples
+
+@host = http://localhost:3001
+@apiBase = {{host}}/v1
+@token = 
+@resourceId = 1
+
+### Example: List resources
+GET {{apiBase}}/resources
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Example: Get resource by id
+GET {{apiBase}}/resources/{{resourceId}}
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Example: Create resource
+POST {{apiBase}}/resources
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Example",
+  "description": "Replace with actual body"
+}
+
+# Notes:
+# - Use `{{apiBase}}` instead of hardcoding `/v1` so the version is explicit
+# - Add `Accept` and `Authorization` headers where appropriate
+# - Keep variables at the top for easy editing by developers or CI
