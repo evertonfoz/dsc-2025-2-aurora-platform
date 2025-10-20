@@ -9,26 +9,28 @@ export class EnableCitextAndUsersEmailCitext1729090000000
 
     // If there's a unique constraint/index on email, drop it first (the original migration created it as unique column)
     // We'll try to drop any unique index named users_email_key or idx_users_email if exists, then alter column type
+    // If users table exists, drop any existing email constraint/index and migrate column to citext
+    // Wrap all changes in a single DO block so the migration is safe when the users table is not yet present.
     await queryRunner.query(
       `DO $$
       BEGIN
-        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_email_key') THEN
-          ALTER TABLE users DROP CONSTRAINT users_email_key;
-        END IF;
-        IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'users_email_idx') THEN
-          DROP INDEX users_email_idx;
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users') THEN
+          IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_email_key') THEN
+            ALTER TABLE users DROP CONSTRAINT users_email_key;
+          END IF;
+          IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'users_email_idx') THEN
+            DROP INDEX users_email_idx;
+          END IF;
+
+          -- Alter column to citext
+          EXECUTE 'ALTER TABLE users ALTER COLUMN email TYPE citext';
+
+          -- Recreate unique constraint on email if needed
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_email_key') THEN
+            ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE (email);
+          END IF;
         END IF;
       END$$;`,
-    );
-
-    // Alter column to citext
-    await queryRunner.query(
-      `ALTER TABLE users ALTER COLUMN email TYPE citext;`,
-    );
-
-    // Recreate unique constraint on email
-    await queryRunner.query(
-      `ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE (email);`,
     );
   }
 
