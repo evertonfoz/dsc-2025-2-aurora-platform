@@ -9,7 +9,8 @@ import {
 import { EventState } from '../enums/event-state.enum';
 import { EventVisibility } from '../enums/event-visibility.enum';
 
-@Entity()
+// Explicitly map to the "events" table created by migrations
+@Entity('events')
 @Index(['slug'], { unique: true })
 @Index(['startsAt'])
 @Index(['state', 'visibility'])
