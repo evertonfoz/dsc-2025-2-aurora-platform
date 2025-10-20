@@ -1,0 +1,26 @@
+@eventId = 1
+
+### Get all Events
+GET http://localhost:3001/events
+
+### Create Event (without slug)
+POST http://localhost:3001/events
+Content-Type: application/json
+
+{
+  "title": "Sample Event",
+  "summary": "This is a sample event summary",
+  "description": "Detailed description of the sample event",
+  "startsAt": "2025-12-01T10:00:00Z",
+  "endsAt": "2025-12-01T12:00:00Z",
+  "visibility": "public"
+}
+
+### Publish Event
+POST http://localhost:3001/events/{{eventId}}/publish
+
+### List Published Events with filters
+GET http://localhost:3001/events?q=sample&from=2025-12-01T00:00:00Z&to=2025-12-31T23:59:59Z&page=1&limit=10
+
+### Get Event by Slug
+GET http://localhost:3001/events/sample-event
