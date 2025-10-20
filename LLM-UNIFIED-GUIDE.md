@@ -285,3 +285,68 @@ Colocar estas regras no fluxo de geração de código reduzirá regressões por 
 - Include `Accept: application/json` and `Authorization: Bearer {{token}}` headers where appropriate.
 
 Add the `https/http-template.http` to new feature branches when creating new HTTP examples and document the usage in the PR body so reviewers can validate the requests quickly.
+
+---
+
+## Migrations — post-mortem e checklist preventivo
+
+Durante a implementação e validação desta feature (entidade RefreshToken + migrations) encontramos vários problemas recorrentes de migrations que causaram falhas no CI. Documentar estes pontos e a checklist abaixo vai ajudar a evitar regressões semelhantes no futuro.
+
+Problemas observados
+- Migrations que alteravam objetos (ALTER TABLE, CREATE INDEX, ADD CONSTRAINT) foram executadas antes das migrations que criavam as tabelas (ordem de timestamps inconsistente). Resultado: `relation "users" does not exist`.
+- Blocos PL/pgSQL em `DO $$ ... END$$;` com sintaxe inválida (declaração de variáveis dentro do `BEGIN`, comentários SQL dentro de arquivos TypeScript) causaram parse errors no runtime do Postgres.
+- Opções de `docker run`/`--health-cmd` sem aspas causavam parsing incorreto das flags (ex: `-U` sendo interpretado como flag do docker) e faziam o container não ser criado no CI.
+- Logs insuficientes no CI (stderr suprimido) dificultavam identificar a query exata que falhou.
+
+Correções aplicadas nesta branch
+- Tornamos migrations idempotentes e seguras: todas as operations que mexem em `users` foram envoltas em `IF EXISTS` e `DO $$ ... END$$;` para só executar quando a tabela existir.
+- Corrigimos blocos PL/pgSQL declarando variáveis com `DECLARE` antes do `BEGIN` e removemos comentários SQL que quebravam o parser TypeScript.
+- Ajustamos o workflow do GitHub Actions: colocamos `--health-cmd "pg_isready -U postgres"` (com aspas), adicionamos espera por readiness e tornamos a etapa de migrations verbosa (DEBUG=typeorm, set -x) e capturamos `migration.log` como artifact.
+
+Checklist preventivo para novas migrations
+1. Ordem das migrations
+  - Sempre crie migrations que criam tabelas antes de migrations que alteram essas mesmas tabelas. Use timestamps coerentes (ou gere a migration logo após a criação da tabela).
+  - Se uma migration depende de outra existente, documente a dependência no cabeçalho do arquivo de migration.
+2. Segurança / idempotência
+  - Ao escrever uma migration que altera uma tabela, envolva a operação em um bloco `DO $$ ... END$$;` que verifica `IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '<table>') THEN ... END IF;`.
+  - Use `IF EXISTS`/`IF NOT EXISTS` nas operações (DROP INDEX IF EXISTS, CREATE INDEX IF NOT EXISTS) onde possível.
+3. PL/pgSQL correto
+  - Declare variáveis na seção `DECLARE` antes de `BEGIN` dentro de `DO $$` blocks.
+  - Teste o bloco PL/pgSQL localmente com psql antes de commitar quando possível.
+4. Comentários e sintaxe
+  - Não deixe comentários `--` soltos em arquivos TypeScript fora de strings; comentários SQL dentro de strings são OK, mas não confundam com comentários fora do literal.
+5. CI readiness e healthchecks
+  - No workflow, passe `--health-cmd "pg_isready -U $PGUSER"` entre aspas para evitar parsing de flags.
+  - Aguarde readiness explícita (pg_isready ou psql check) antes de rodar migrations.
+6. Logging e debug
+  - Deixe a etapa de migrations com saída verbosa em PRs/CI: `DEBUG=typeorm:*` e capture logs para artifact (`migration.log`) em caso de falha.
+7. Rollback seguro
+  - Garanta que a função `down` de cada migration também seja segura (usar IF EXISTS) para evitar falhas ao reverter.
+8. Teste local rápido
+  - Sempre rode `npm run migration:run` contra um Postgres local (docker-compose) em um ambiente limpo antes de abrir PR.
+
+Exemplo mínimo seguro (pattern) para uma migration que altera `users.email`:
+
+```sql
+DO $$
+DECLARE
+  _dummy int;
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users') THEN
+   -- safe drop constraint/index if exists
+   IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_email_key') THEN
+    ALTER TABLE users DROP CONSTRAINT users_email_key;
+   END IF;
+
+   -- alter column
+   EXECUTE 'ALTER TABLE users ALTER COLUMN email TYPE citext';
+
+   -- recreate unique constraint safely
+   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_email_key') THEN
+    ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE (email);
+   END IF;
+  END IF;
+END$$;
+```
+
+Adicione essa seção ao `LLM-UNIFIED-GUIDE.md` para que contribuições futuras (manualmente ou via LLM) sigam este padrão.
