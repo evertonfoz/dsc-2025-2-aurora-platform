@@ -20,18 +20,25 @@ export class EnsureSingleUsersEmailUniqueIndex1758049174211
     await queryRunner.query(
       `ALTER TABLE users DROP CONSTRAINT IF EXISTS idx_users_email_unique;`,
     );
+    // Older Postgres versions don't support `ADD CONSTRAINT IF NOT EXISTS`.
+    // Create a named unique index instead (idempotent with IF NOT EXISTS).
     await queryRunner.query(
-      `ALTER TABLE users ADD CONSTRAINT IF NOT EXISTS idx_users_email_unique UNIQUE (email);`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users (email);`,
     );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Recreate a generic users_email_key constraint on down
-    await queryRunner.query(
-      `ALTER TABLE IF EXISTS users DROP CONSTRAINT IF EXISTS idx_users_email_unique;`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE IF EXISTS users ADD CONSTRAINT IF NOT EXISTS users_email_key UNIQUE (email);`,
-    );
+    // Remove the named index if it exists
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_users_email_unique;`);
+    // Optionally recreate a generic unique constraint (keep compatibility with previous schema expectations)
+    await queryRunner.query(`DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints tc
+        WHERE tc.table_name = 'users' AND tc.constraint_type = 'UNIQUE' AND tc.constraint_name = 'users_email_key'
+      ) THEN
+        ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE (email);
+      END IF;
+    END$$;`);
   }
 }
