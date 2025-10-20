@@ -15,16 +15,7 @@ export class RemoveDuplicateUsersEmailIndexes1729090000002
         END IF;
 
         -- Drop any other UNIQUE indexes on users(email) except the one we want
-        PERFORM (
-          SELECT 1 FROM (
-            SELECT indexname FROM pg_indexes
-            WHERE tablename = 'users'
-              AND indexdef ILIKE '%(email)%'
-              AND indexdef ILIKE '%UNIQUE%'
-              AND indexname <> 'idx_users_email_unique'
-          ) t
-        );
-
+        DECLARE r RECORD;
         FOR r IN
           SELECT indexname FROM pg_indexes
           WHERE tablename = 'users'
