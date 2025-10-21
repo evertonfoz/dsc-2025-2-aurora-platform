@@ -120,6 +120,54 @@ import { Event } from '../../src/events/entities/event.entity';
 
 Seguindo esse padrão, os LLMs e contribuidores manterão consistência com o restante do repositório e evitarão testes espalhados dentro de `src/`.
 
+### 8.3 Padrão de Factories de Teste
+
+Para reduzir duplicação e aumentar a clareza dos specs, adote factories de teste em `test/factories/` para cada domínio principal (ex: `event.factory.ts`, `user.factory.ts`).
+
+- O que colocar na factory:
+  - helpers para criar DTOs (ex: `makeCreateEventDto(overrides?)`) que retornam tipos dos DTOs usados pelos controllers/services.
+  - helpers para criar entidades (`makeEventEntity(overrides?)`) que retornam objetos compatíveis com as entidades do TypeORM (úteis para mocks do repositório).
+
+- Contrato das factories:
+  - Inputs: `Partial<T>` (overrides) para customizar valores em cada teste.
+  - Outputs: objetos tipados (`CreateEventDto`, `Partial<Event>`, etc.) prontos para uso em testes.
+
+- Nome e localização:
+  - `test/factories/<feature>.factory.ts` (ex: `test/factories/event.factory.ts`).
+  - Expor funções `makeCreateXxxDto`, `makeXxxEntity`.
+
+- Boas práticas:
+  - Forneça valores padrão válidos (p.ex. datas em ISO quando DTO espera string, enums válidos).
+  - Permita overrides para casos específicos.
+  - Use `Partial<T>` para inputs nos factories para garantir tipagem.
+  - Evite lógica complexa na factory; mantenha-a previsível.
+
+- Exemplo mínimo (para events):
+
+```ts
+// test/factories/event.factory.ts
+import { CreateEventDto } from '../../src/events/dto/create-event.dto';
+import { Event } from '../../src/events/entities/event.entity';
+
+export function makeCreateEventDto(overrides?: Partial<CreateEventDto>): CreateEventDto { /* ... */ }
+export function makeEventEntity(overrides?: Partial<Event>): Partial<Event> { /* ... */ }
+```
+
+- Quando usar factories nos specs:
+  - Em services: criar entidades retornadas pelo repositório e DTOs recebidos pelos métodos.
+  - Em controllers: usar DTOs para requisições e entidades/DTOs para valores retornados pelo service.
+
+- Checklist ao adicionar factories a um PR:
+
+```
+- [ ] Factory criada em `test/factories/` com função `makeCreateXxxDto` e `makeXxxEntity`.
+- [ ] Specs atualizados para consumir a factory (evitar objetos inline repetidos).
+- [ ] Testes locais rodaram (`npm test`) e passaram.
+- [ ] Não há dependências pesadas dentro da factory (ex: acesso a DB ou chamadas de rede).
+```
+
+Adicionar esta seção ao `LLM-UNIFIED-GUIDE.md` ajudará LLMs e humanos a seguir um padrão consistente ao gerar testes automaticamente.
+
 ### 9. Boas Práticas para Testes
 - Sempre mocke métodos privados e dependências relevantes (ex: hash de senha).
 - Garanta que os testes reflitam o fluxo real do serviço, especialmente para métodos que envolvem lógica adicional (ex: hashing, normalização).
