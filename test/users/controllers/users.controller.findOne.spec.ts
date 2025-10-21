@@ -4,7 +4,10 @@ import { UsersController } from '../../../src/users/users.controller';
 import { UsersService } from '../../../src/users/users.service';
 import { UserRole } from '../../../src/users/enums/user-role.enum';
 import { makeUserEntity } from '../../factories/user.factory';
-import { expectDtoMappedToEntity, expectNoSensitiveFields } from '../../utils/asserts';
+import {
+  expectDtoMappedToEntity,
+  expectNoSensitiveFields,
+} from '../../utils/asserts';
 describe('UsersController – findOne', () => {
   let controller: UsersController;
   const service = { findOne: jest.fn() };
@@ -19,12 +22,27 @@ describe('UsersController – findOne', () => {
   });
 
   it('GET /users/:id → delega ao service.findOne e retorna o usuário mapeado para DTO', async () => {
-  const user = makeUserEntity({ id: 42, name: 'Grace Hopper', email: 'grace@navy.mil', role: UserRole.ADMIN } as any) as any;
-  service.findOne.mockResolvedValue(user);
-  const res = await controller.findOne('42');
-  expect(service.findOne).toHaveBeenCalledWith(42);
-  expectDtoMappedToEntity({ id: 42, name: 'Grace Hopper', email: 'grace@navy.mil', role: UserRole.ADMIN, isActive: true } as any, res as any, ['id', 'name', 'email', 'role', 'isActive']);
-  expectNoSensitiveFields(res as any);
+    const user = makeUserEntity({
+      id: 42,
+      name: 'Grace Hopper',
+      email: 'grace@navy.mil',
+      role: UserRole.ADMIN,
+    } as any) as any;
+    service.findOne.mockResolvedValue(user);
+    const res = await controller.findOne('42');
+    expect(service.findOne).toHaveBeenCalledWith(42);
+    expectDtoMappedToEntity(
+      {
+        id: 42,
+        name: 'Grace Hopper',
+        email: 'grace@navy.mil',
+        role: UserRole.ADMIN,
+        isActive: true,
+      } as any,
+      res as any,
+      ['id', 'name', 'email', 'role', 'isActive'],
+    );
+    expectNoSensitiveFields(res as any);
   });
 
   it('GET /users/:id → lança NotFoundException se usuário não existe', async () => {

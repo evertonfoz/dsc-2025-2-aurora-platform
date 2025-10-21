@@ -5,7 +5,10 @@ import { Event } from '../../../src/events/entities/event.entity';
 import { EventsService } from '../../../src/events/events.service';
 import { repositoryMockFactory, MockType } from '../../mocks/repository.mock';
 import { CreateEventDto } from '../../../src/events/dto/create-event.dto';
-import { makeCreateEventDto, makeEventEntity } from '../../factories/event.factory';
+import {
+  makeCreateEventDto,
+  makeEventEntity,
+} from '../../factories/event.factory';
 
 describe('EventsService  create', () => {
   let service: EventsService;
@@ -27,14 +30,22 @@ describe('EventsService  create', () => {
   });
 
   it('creates an event with valid dates and owner', async () => {
-    const dto = makeCreateEventDto({ title: 'My Event', summary: 'Summ', description: 'Desc' });
-    const saved = makeEventEntity({ id: 1, slug: 'my-event', ...dto } as any) as any;
+    const dto = makeCreateEventDto({
+      title: 'My Event',
+      summary: 'Summ',
+      description: 'Desc',
+    });
+    const saved = makeEventEntity({
+      id: 1,
+      slug: 'my-event',
+      ...dto,
+    } as any) as any;
 
     repository.findOne.mockResolvedValue(undefined); // ensureUniqueSlug
     repository.create.mockReturnValue(saved);
     repository.save.mockResolvedValue(saved);
 
-    const result = await service.create(dto as CreateEventDto, 123);
+    const result = await service.create(dto, 123);
 
     expect(repository.create).toHaveBeenCalled();
     expect(repository.save).toHaveBeenCalled();

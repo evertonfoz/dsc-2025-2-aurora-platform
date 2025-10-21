@@ -34,8 +34,10 @@ describe('UsersService', () => {
       const user = makeUserEntity({ id: 1, name: 'John Doe' } as any) as any;
       repositoryMock.findOne.mockResolvedValue(user);
 
-  const result = await service.findOne(1);
-  expect(result).toEqual(expect.objectContaining({ id: user.id, name: user.name }));
+      const result = await service.findOne(1);
+      expect(result).toEqual(
+        expect.objectContaining({ id: user.id, name: user.name }),
+      );
     });
 
     it('should throw a NotFoundException if user not found', async () => {

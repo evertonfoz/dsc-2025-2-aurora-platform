@@ -4,7 +4,9 @@ import { UserRole } from '../../src/users/enums/user-role.enum';
 
 let userSeq = 1;
 
-export function makeCreateUserDto(overrides?: Partial<CreateUserDto>): CreateUserDto {
+export function makeCreateUserDto(
+  overrides?: Partial<CreateUserDto>,
+): CreateUserDto {
   const base: CreateUserDto = {
     name: `User ${userSeq}`,
     email: `user${userSeq}@example.com`,

@@ -5,7 +5,9 @@ import { EventState } from '../../src/events/enums/event-state.enum';
 
 let seq = 1;
 
-export function makeCreateEventDto(overrides?: Partial<CreateEventDto>): CreateEventDto {
+export function makeCreateEventDto(
+  overrides?: Partial<CreateEventDto>,
+): CreateEventDto {
   const now = new Date();
   const startsAt = new Date(now.getTime() + 1000 * 60 * 60).toISOString();
   const endsAt = new Date(now.getTime() + 1000 * 60 * 60 * 2).toISOString();

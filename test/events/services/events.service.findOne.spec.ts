@@ -36,16 +36,21 @@ describe('EventsService  findOneByIdOrSlug', () => {
       where: jest.fn().mockReturnThis(),
       getOne: jest.fn().mockResolvedValue(event),
     };
-    repository.createQueryBuilder.mockReturnValue(qb as any);
+    repository.createQueryBuilder.mockReturnValue(qb);
 
     const found = await service.findOneByIdOrSlug(1);
     expect(found).toBe(event);
   });
 
   it('throws NotFoundException when not found', async () => {
-    const qb: any = { where: jest.fn().mockReturnThis(), getOne: jest.fn().mockResolvedValue(undefined) };
-    repository.createQueryBuilder.mockReturnValue(qb as any);
-    await expect(service.findOneByIdOrSlug(999)).rejects.toThrow('Event not found');
+    const qb: any = {
+      where: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(undefined),
+    };
+    repository.createQueryBuilder.mockReturnValue(qb);
+    await expect(service.findOneByIdOrSlug(999)).rejects.toThrow(
+      'Event not found',
+    );
   });
 
   it('throws Forbidden when event not published and requester not owner', async () => {
@@ -53,8 +58,11 @@ describe('EventsService  findOneByIdOrSlug', () => {
     event.id = 2;
     event.state = EventState.DRAFT;
     event.ownerUserId = 10;
-    const qb: any = { where: jest.fn().mockReturnThis(), getOne: jest.fn().mockResolvedValue(event) };
-    repository.createQueryBuilder.mockReturnValue(qb as any);
+    const qb: any = {
+      where: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(event),
+    };
+    repository.createQueryBuilder.mockReturnValue(qb);
     await expect(service.findOneByIdOrSlug(2)).rejects.toThrow('Access denied');
   });
 });

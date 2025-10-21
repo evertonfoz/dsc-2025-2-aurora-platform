@@ -27,16 +27,25 @@ describe('EventsService \u2013 publish', () => {
 
   it('publishes when owner and in draft', async () => {
     const existing: any = { id: 8, ownerUserId: 20, state: EventState.DRAFT };
-    repository.findOneBy.mockResolvedValue(existing as any);
-    repository.save.mockResolvedValue({ ...existing, state: EventState.PUBLISHED } as any);
+    repository.findOneBy.mockResolvedValue(existing);
+    repository.save.mockResolvedValue({
+      ...existing,
+      state: EventState.PUBLISHED,
+    });
 
     const result = await service.publish(8, { id: 20, isAdmin: false });
     expect(result.state).toBe(EventState.PUBLISHED);
   });
 
   it('throws when invalid transition', async () => {
-    const existing: any = { id: 9, ownerUserId: 2, state: EventState.PUBLISHED };
-    repository.findOneBy.mockResolvedValue(existing as any);
-    await expect(service.publish(9, { id: 2, isAdmin: false })).rejects.toThrow('Can only publish draft or archived events');
+    const existing: any = {
+      id: 9,
+      ownerUserId: 2,
+      state: EventState.PUBLISHED,
+    };
+    repository.findOneBy.mockResolvedValue(existing);
+    await expect(service.publish(9, { id: 2, isAdmin: false })).rejects.toThrow(
+      'Can only publish draft or archived events',
+    );
   });
 });
