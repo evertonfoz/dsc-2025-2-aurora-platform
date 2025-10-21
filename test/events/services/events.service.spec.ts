@@ -1,40 +1,29 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { EventsService } from '../../src/events/events.service';
+import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Event } from '../../src/events/entities/event.entity';
 import { Repository } from 'typeorm';
-import { EventState } from '../../src/events/enums/event-state.enum';
-import { EventVisibility } from '../../src/events/enums/event-visibility.enum';
-
-type MockRepository<T = any> = Partial<Record<string, jest.Mock>>;
-
-const createMockRepository = <T = any>(): MockRepository<T> => ({
-  create: jest.fn(),
-  save: jest.fn(),
-  findOne: jest.fn(),
-  findOneBy: jest.fn(),
-  createQueryBuilder: jest.fn(),
-  find: jest.fn(),
-});
+import { Event } from '../../../src/events/entities/event.entity';
+import { EventsService } from '../../../src/events/events.service';
+import { EventState } from '../../../src/events/enums/event-state.enum';
+import { EventVisibility } from '../../../src/events/enums/event-visibility.enum';
+import { repositoryMockFactory, MockType } from '../../mocks/repository.mock';
 
 describe('EventsService', () => {
   let service: EventsService;
-  let repo: MockRepository<Event>;
+  let repository: MockType<Repository<Event>>;
 
   beforeEach(async () => {
-    repo = createMockRepository<Event>();
-
-    const module: TestingModule = await Test.createTestingModule({
+    const module = await Test.createTestingModule({
       providers: [
         EventsService,
         {
           provide: getRepositoryToken(Event),
-          useValue: repo,
+          useFactory: repositoryMockFactory,
         },
       ],
     }).compile();
 
     service = module.get<EventsService>(EventsService);
+    repository = module.get(getRepositoryToken(Event));
   });
 
   it('should be defined', () => {
@@ -53,14 +42,14 @@ describe('EventsService', () => {
 
       const saved = { id: 1, ...dto, slug: 'my-event', state: EventState.DRAFT };
 
-      repo.create!.mockReturnValue(saved);
-      repo.save!.mockResolvedValue(saved);
-      // ensureUniqueSlug calls repository.findOne -> use findOne mock
-      repo.findOne!.mockResolvedValue(undefined);
+      repository.findOne.mockResolvedValue(undefined); // ensureUniqueSlug
+      repository.create.mockReturnValue(saved as any);
+      repository.save.mockResolvedValue(saved as any);
 
       const result = await service.create(dto, 123);
-      expect(repo.create).toHaveBeenCalled();
-      expect(repo.save).toHaveBeenCalled();
+
+      expect(repository.create).toHaveBeenCalled();
+      expect(repository.save).toHaveBeenCalled();
       expect(result).toEqual(saved);
     });
 
@@ -82,21 +71,20 @@ describe('EventsService', () => {
       event.id = 1;
       event.state = EventState.PUBLISHED;
       event.visibility = EventVisibility.PUBLIC;
-      repo.createQueryBuilder!.mockReturnValue({
+      // mock createQueryBuilder
+      const qb: any = {
         where: jest.fn().mockReturnThis(),
         getOne: jest.fn().mockResolvedValue(event),
-      });
+      };
+      repository.createQueryBuilder.mockReturnValue(qb as any);
 
       const found = await service.findOneByIdOrSlug(1);
       expect(found).toBe(event);
     });
 
     it('throws NotFoundException when not found', async () => {
-      repo.createQueryBuilder!.mockReturnValue({
-        where: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockResolvedValue(undefined),
-      });
-
+      const qb: any = { where: jest.fn().mockReturnThis(), getOne: jest.fn().mockResolvedValue(undefined) };
+      repository.createQueryBuilder.mockReturnValue(qb as any);
       await expect(service.findOneByIdOrSlug(999)).rejects.toThrow('Event not found');
     });
 
@@ -105,11 +93,8 @@ describe('EventsService', () => {
       event.id = 2;
       event.state = EventState.DRAFT;
       event.ownerUserId = 10;
-      repo.createQueryBuilder!.mockReturnValue({
-        where: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockResolvedValue(event),
-      });
-
+      const qb: any = { where: jest.fn().mockReturnThis(), getOne: jest.fn().mockResolvedValue(event) };
+      repository.createQueryBuilder.mockReturnValue(qb as any);
       await expect(service.findOneByIdOrSlug(2)).rejects.toThrow('Access denied');
     });
   });
@@ -122,17 +107,17 @@ describe('EventsService', () => {
         startsAt: new Date(Date.now()),
         endsAt: new Date(Date.now() + 1000 * 60 * 60),
       };
-      repo.findOneBy!.mockResolvedValue(existing);
-      repo.save!.mockResolvedValue({ ...existing, title: 'updated' });
+      repository.findOneBy.mockResolvedValue(existing as any);
+      repository.save.mockResolvedValue({ ...existing, title: 'updated' } as any);
 
       const result = await service.update(5, { title: 'updated' } as any, { id: 7, isAdmin: false });
-      expect(repo.findOneBy).toHaveBeenCalledWith({ id: 5 });
+      expect(repository.findOneBy).toHaveBeenCalledWith({ id: 5 });
       expect(result.title).toBe('updated');
     });
 
     it('throws Forbidden when requester is not owner', async () => {
       const existing: any = { id: 6, ownerUserId: 99, startsAt: new Date(), endsAt: new Date(Date.now() + 1000 * 60 * 60) };
-      repo.findOneBy!.mockResolvedValue(existing);
+      repository.findOneBy.mockResolvedValue(existing as any);
       await expect(service.update(6, { title: 'x' } as any, { id: 1, isAdmin: false })).rejects.toThrow('Access denied');
     });
   });
@@ -140,8 +125,8 @@ describe('EventsService', () => {
   describe('publish', () => {
     it('publishes when owner and in draft', async () => {
       const existing: any = { id: 8, ownerUserId: 20, state: EventState.DRAFT };
-      repo.findOneBy!.mockResolvedValue(existing);
-      repo.save!.mockResolvedValue({ ...existing, state: EventState.PUBLISHED });
+      repository.findOneBy.mockResolvedValue(existing as any);
+      repository.save.mockResolvedValue({ ...existing, state: EventState.PUBLISHED } as any);
 
       const result = await service.publish(8, { id: 20, isAdmin: false });
       expect(result.state).toBe(EventState.PUBLISHED);
@@ -149,7 +134,7 @@ describe('EventsService', () => {
 
     it('throws when invalid transition', async () => {
       const existing: any = { id: 9, ownerUserId: 2, state: EventState.PUBLISHED };
-      repo.findOneBy!.mockResolvedValue(existing);
+      repository.findOneBy.mockResolvedValue(existing as any);
       await expect(service.publish(9, { id: 2, isAdmin: false })).rejects.toThrow('Can only publish draft or archived events');
     });
   });
