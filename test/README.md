@@ -44,6 +44,15 @@ This file was added/updated in branch `test/events` while migrating and standard
 - `test/factories/event.factory.ts` — factory for create DTO and event entity.
 - `test/smoke/events/events.smoke.spec.ts` — moved smoke test (was `test/app.e2e-spec.ts`) to `test/smoke/events/`.
 - `LLM-UNIFIED-GUIDE.md` — sections added/updated: tests location, factories, helpers and PR checklist.
+- `test/auth/services/` — new auth service specs split by method:
+  - `auth.service.login.spec.ts`
+  - `auth.service.refresh.spec.ts`
+  - `auth.service.logout.spec.ts`
+  - `auth.service.me.spec.ts`
+  (deleted previous combined `auth.service.spec.ts`)
+- `test/factories/refresh-token.factory.ts` — factory for refresh token entities used in tests.
+- `test/mocks/repository.mock.ts` — reused to standardize repository mocks via `repositoryMockFactory` and `MockType`.
+- `LLM-UNIFIED-GUIDE.md` — updated to instruct LLMs to always split specs per method and to use factories/mocks.
 
 ## How to run tests locally
 
@@ -75,6 +84,11 @@ Notes:
 - When generating tests via LLMs, follow the `test/` layout and use factories and `repositoryMockFactory` for mocked repos.
 - If you find a large combined spec file, split it into per-method specs, add factories/helpers, and only delete the original file after the new specs pass.
 - Always run `npm run lint` and `npm test` locally before opening a PR.
+
+Additional notes for this branch:
+- Auth tests were created following the repository conventions: one file per method under `test/auth/services/`.
+- Tests use `repositoryMockFactory` for repository mocks and the `makeRefreshTokenEntity` factory to create consistent fixtures.
+- The `LLM-UNIFIED-GUIDE.md` was updated so future LLM-generated tests follow this pattern automatically.
 
 ## Checklist for PRs touching tests
 
