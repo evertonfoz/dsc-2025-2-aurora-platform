@@ -175,6 +175,53 @@ export function makeEventEntity(overrides?: Partial<Event>): Partial<Event> { /*
 
 Adicionar esta seção ao `LLM-UNIFIED-GUIDE.md` ajudará LLMs e humanos a seguir um padrão consistente ao gerar testes automaticamente.
 
+### 8.4 Padrão de Helpers / Utils de Teste
+
+Além de factories e mocks, use helpers (utils) para reduzir duplicação nos specs e para centralizar assert checks que reaparecem entre controllers e services.
+
+- Localização e naming:
+  - Crie `test/utils/` para helpers genéricos (ex: `asserts.ts`, `date.ts`, `enums.ts`).
+  - Exporte funções nomeadas de forma clara: `expectDtoMappedToEntity`, `expectNoSensitiveFields`, `normalizeDateForAssert`.
+
+- O que deve conter um helper de asserts (`test/utils/asserts.ts`):
+  - Funções que comparam DTO ↔ Entity por chaves selecionadas, tratando diferenças comuns (Date <-> ISO string) de forma previsível.
+  - Funções que verificam ausência de campos sensíveis (`passwordHash`, `secret`) em objetos retornados por controllers.
+  - Helpers leves — evite lógica complexa, IO, ou acesso a DB dentro de `test/utils`.
+
+- Como o LLM deve usar helpers ao gerar ou refatorar tests:
+  1. Ao gerar um controller spec, importe e use `expectDtoMappedToEntity` para comparar os campos essenciais entre resposta e factory/entity.
+ 2. Ao gerar/ajustar um spec que verifica remoção/retorno de usuário, use `expectNoSensitiveFields` em vez de asserts manuais repetidos.
+ 3. Sempre adicione novos helpers em `test/utils/` quando detectar padrões repetidos em >2 specs.
+
+- Regras para arquivos combinados / duplicados:
+  - Prefira specs modularizados (um método/arquivo por spec) em `test/<feature>/controllers` e `test/<feature>/services`.
+  - Se encontrar arquivos combinados antigos (ex: `events.service.spec.ts` contendo muitos describes), o LLM deve:
+    1. Dividir o spec em arquivos por método (ex: `events.service.create.spec.ts`, `events.service.findOne.spec.ts`, ...).
+    2. Atualizar imports relativos e garantir que factories/mocks apontem para `../../factories` e `../../mocks` conforme necessário.
+    3. Remover o arquivo combinado antigo apenas depois de confirmar que os novos arquivos passam localmente.
+
+- Exemplo (uso mínimo em controller spec):
+
+```ts
+import { expectDtoMappedToEntity, expectNoSensitiveFields } from '../../utils/asserts';
+// ...
+const res = await controller.findOne('42');
+expectDtoMappedToEntity({ id: 42, name: 'Grace' }, res, ['id','name']);
+expectNoSensitiveFields(res);
+```
+
+- Checklist para PRs envolvendo helpers/refactor de specs:
+
+```
+- [ ] Novos helpers adicionados só em `test/utils/` e documentados (arquivo com JSDoc curto)
+- [ ] Specs refatorados para importar helpers ao invés de duplicar asserts
+- [ ] Arquivos combinados antigos (se existiam) foram removidos apenas após novos specs passarem localmente
+- [ ] Rodei `npm run lint` e `npm test` — todos os specs relevantes passaram localmente
+- [ ] Não adicionei IO/DB/network nos helpers; são funções puras
+```
+
+Registrar estas regras no guia garante que LLMs apliquem o mesmo padrão reproduzido manualmente neste repositório e evita regressões por duplicação de asserts.
+
 ### 9. Boas Práticas para Testes
 - Sempre mocke métodos privados e dependências relevantes (ex: hash de senha).
 - Garanta que os testes reflitam o fluxo real do serviço, especialmente para métodos que envolvem lógica adicional (ex: hashing, normalização).
