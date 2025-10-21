@@ -21,7 +21,7 @@ describe('AuthController – me', () => {
   });
 
   it('GET /auth/me → verifica token e delega a service.me', async () => {
-    jwt.verify.mockReturnValue({ sub: '7' });
+  jwt.verify.mockReturnValue({ sub: '7' });
     service.me.mockResolvedValue({ id: 7, email: 'ok@example.com' });
     const res = await controller.me('Bearer token');
     expect(jwt.verify).toHaveBeenCalled();

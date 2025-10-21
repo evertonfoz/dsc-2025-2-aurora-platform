@@ -23,7 +23,7 @@ describe('AuthController – refresh', () => {
   it('POST /auth/refresh → delega ao service.refresh', async () => {
     service.refresh.mockResolvedValue({ accessToken: 'a2', refreshToken: 'r2' });
     const body = { refreshToken: 'tok' } as any;
-    const req: any = { headers: { 'user-agent': 'ua2' } };
+  const req: any = { get: (k: string) => (k === 'user-agent' ? 'ua2' : undefined) };
     const res = await controller.refresh(body, '5.6.7.8', req);
     expect(service.refresh).toHaveBeenCalledWith(body.refreshToken, '5.6.7.8', 'ua2');
     expect(res).toEqual({ accessToken: 'a2', refreshToken: 'r2' });

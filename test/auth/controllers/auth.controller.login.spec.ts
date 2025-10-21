@@ -24,7 +24,7 @@ describe('AuthController – login', () => {
   it('POST /auth/login → delega ao service.login', async () => {
     service.login.mockResolvedValue({ accessToken: 'a', refreshToken: 'r' });
     const body = { email: 'ok@example.com', password: 'secret' } as any;
-    const req: any = { headers: { 'user-agent': 'ua' } };
+  const req: any = { get: (k: string) => (k === 'user-agent' ? 'ua' : undefined) };
     const res = await controller.login(body, '1.2.3.4', req);
     expect(service.login).toHaveBeenCalledWith(body.email, body.password, '1.2.3.4', 'ua');
     expect(res).toEqual({ accessToken: 'a', refreshToken: 'r' });
