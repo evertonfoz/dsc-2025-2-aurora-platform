@@ -3,6 +3,7 @@ import { EventsController } from '../../../src/events/events.controller';
 import { EventsService } from '../../../src/events/events.service';
 import { EventState } from '../../../src/events/enums/event-state.enum';
 import { makeEventEntity } from '../../factories/event.factory';
+import { expectDtoMappedToEntity } from '../../utils/asserts';
 
 describe('EventsController – findOne', () => {
   let controller: EventsController;
@@ -18,12 +19,12 @@ describe('EventsController – findOne', () => {
   });
 
   it('GET /events → delega findAll e retorna resultado', async () => {
-    const ev = makeEventEntity() as any;
-    service.findAll.mockResolvedValue({ events: [ev], total: 1, page: 1, limit: 20 });
-    const res = await controller.findAll(undefined, undefined, undefined, undefined, undefined, undefined, undefined);
-    expect(service.findAll).toHaveBeenCalledWith(expect.objectContaining({ page: 1, limit: 20 }));
-    expect(res).toHaveProperty('events');
-    expect(res.events[0]).toMatchObject({ id: ev.id, title: ev.title });
+  const ev = makeEventEntity() as any;
+  service.findAll.mockResolvedValue({ events: [ev], total: 1, page: 1, limit: 20 });
+  const res = await controller.findAll(undefined, undefined, undefined, undefined, undefined, undefined, undefined);
+  expect(service.findAll).toHaveBeenCalledWith(expect.objectContaining({ page: 1, limit: 20 }));
+  expect(res).toHaveProperty('events');
+  expectDtoMappedToEntity({ id: ev.id, title: ev.title } as any, res.events[0] as any, ['id', 'title']);
   });
 
   it('GET /events/:idOrSlug numeric → delega findOneByIdOrSlug com number', async () => {
