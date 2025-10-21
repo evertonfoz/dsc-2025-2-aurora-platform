@@ -4,6 +4,7 @@ import { UsersController } from '../../../src/users/users.controller';
 import { UsersService } from '../../../src/users/users.service';
 import { UserRole } from '../../../src/users/enums/user-role.enum';
 import { makeUserEntity } from '../../factories/user.factory';
+import { expectDtoMappedToEntity } from '../../utils/asserts';
 describe('UsersController – findAll', () => {
   let controller: UsersController;
   const service = { findAll: jest.fn() };
@@ -31,6 +32,6 @@ describe('UsersController – findAll', () => {
   expect(service.findAll).toHaveBeenCalledWith(query);
   // Compare essential pagination fields and that returned data contains expected user
   expect(res).toEqual(expect.objectContaining({ total: 1, page: 2, limit: 5 }));
-  expect(res.data[0]).toEqual(expect.objectContaining({ id: user.id, email: user.email }));
+  expectDtoMappedToEntity({ id: user.id, email: user.email } as any, res.data[0] as any, ['id', 'email']);
   });
 });

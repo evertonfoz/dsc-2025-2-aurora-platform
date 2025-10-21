@@ -4,6 +4,7 @@ import { UsersController } from '../../../src/users/users.controller';
 import { UsersService } from '../../../src/users/users.service';
 import { UserRole } from '../../../src/users/enums/user-role.enum';
 import { makeCreateUserDto, makeUserEntity } from '../../factories/user.factory';
+import { expectDtoMappedToEntity, expectNoSensitiveFields } from '../../utils/asserts';
 describe('UsersController – update', () => {
   let controller: UsersController;
   const service = { update: jest.fn() };
@@ -23,7 +24,8 @@ describe('UsersController – update', () => {
     service.update.mockResolvedValue(updatedUser);
     const res = await controller.update('7', updateDto as any);
     expect(service.update).toHaveBeenCalledWith(7, updateDto);
-    expect(res).toMatchObject({ id: 7, name: 'Alan Turing', email: 'alan@turing.com', role: UserRole.TEACHER, isActive: true });
+    expectDtoMappedToEntity({ id: 7, name: 'Alan Turing', email: 'alan@turing.com', role: UserRole.TEACHER, isActive: true } as any, res as any, ['id', 'name', 'email', 'role', 'isActive']);
+    expectNoSensitiveFields(res as any);
   });
 
   it('PUT /users/:id → lança NotFoundException se usuário não existe', async () => {
