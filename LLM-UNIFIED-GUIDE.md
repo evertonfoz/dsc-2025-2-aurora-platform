@@ -65,6 +65,61 @@ import { Event } from '../../src/events/entities/event.entity';
 
 Adicione este padrão à checklist do PR (ex: "[x] Testes colocados em `test/` conforme convenção").
 
+### 8.2 Padrão detalhado para testes (para LLMs e contribuidores)
+
+Este projeto segue um padrão consistente para testes que facilita manutenção, reuso de mocks e execução em CI. Registre e siga esse padrão sempre que gerar ou mover testes.
+
+- Localização:
+  - Todos os testes devem ficar em `test/` na raiz do repositório.
+  - Separe por domínio/feature: `test/<feature>/controllers` e `test/<feature>/services`.
+
+- Nome dos arquivos:
+  - Use `*.spec.ts` e nomes descritivos: `events.service.spec.ts`, `users.controller.findOne.spec.ts`.
+  - Para múltiplos casos do mesmo método, prefira sufixos: `users.service.create.spec.ts`, `users.service.remove.spec.ts`.
+
+- Mocks e fábricas:
+  - Centralize mocks reutilizáveis em `test/mocks/`.
+  - Use a fábrica `repositoryMockFactory` para mocks de `Repository<T>` (já presente em `test/mocks/repository.mock.ts`). Exemplo:
+
+```ts
+import { repositoryMockFactory, MockType } from '../../mocks/repository.mock';
+import { getRepositoryToken } from '@nestjs/typeorm';
+
+providers: [
+  YourService,
+  { provide: getRepositoryToken(YourEntity), useFactory: repositoryMockFactory },
+],
+```
+
+- Imports de testes:
+  - Ao importar código de produção desde `test/`, use caminhos relativos para `src`, por exemplo:
+
+```ts
+import { EventsService } from '../../src/events/events.service';
+import { Event } from '../../src/events/entities/event.entity';
+```
+
+- Testes unitários vs testes de integração:
+  - Tests unitários: use mocks (test/mocks) e coloque em `test/<feature>/services` ou `test/<feature>/controllers`.
+  - Tests de integração / smoke que usam DB real: coloque em `test/smoke/` ou `test/integration/` e documente dependências (ex: docker-compose up -d db).
+
+- Convenções de estilo nos testes:
+  - Use `describe` e `it` com strings descritivas em português claro (ou inglês quando o PR for internacional).
+  - Limpe mocks entre testes com `jest.clearAllMocks()` quando necessário.
+  - Feche módulos Nest em testes de integração: `await moduleRef.close();`.
+
+- Checklist para PRs que alteram/ adicionam testes (adicionar ao template do PR):
+
+```
+- [ ] Testes adicionados em `test/` com estrutura `controllers/` e `services/`.
+- [ ] Usado `test/mocks/repository.mock.ts` quando mockando repositórios TypeORM.
+- [ ] `npm run lint` rodado sem erros (ou justificativa no PR se precisar de exceção).
+- [ ] `npm test` — todos os testes unitários passaram localmente.
+- [ ] Se houver testes que usam DB, documentar como rodar (comandos docker-compose) no PR.
+```
+
+Seguindo esse padrão, os LLMs e contribuidores manterão consistência com o restante do repositório e evitarão testes espalhados dentro de `src/`.
+
 ### 9. Boas Práticas para Testes
 - Sempre mocke métodos privados e dependências relevantes (ex: hash de senha).
 - Garanta que os testes reflitam o fluxo real do serviço, especialmente para métodos que envolvem lógica adicional (ex: hashing, normalização).
