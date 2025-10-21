@@ -114,6 +114,17 @@ Adicione informações relevantes, links ou anexos.
 - **Peça explicações e exemplos sempre que necessário**.
 - **Use o Copilot Chat como parceiro ativo, não apenas executor.**
 
+### Evitar editores interativos (IMPORTANTE)
+
+Ao executar comandos Git ou scripts automatizados, NUNCA abra editores interativos (por exemplo: vi, vim, nano) que aguardem entrada do usuário. Em ambientes automatizados e em interações com LLMs, use sempre modos não-interativos e flags que evitem prompts. Exemplos recomendados:
+
+- Para merges automáticos: `git merge --no-ff --no-edit origin/main`
+- Para commits programáticos: `git commit -m "mensagem"` (evite `git commit` sem `-m`)
+- Para rebase sem editor: `GIT_SEQUENCE_EDITOR=":wq" git rebase origin/main` ou usar `git rebase --autosquash --autostash --no-edit` quando aplicável
+- Definir variável temporária para evitar editores: `GIT_MERGE_AUTOEDIT=no` ou `GIT_EDITOR=true` (dependendo do caso)
+
+Adicione essa verificação ao checklist do PR quando um script/LLM executar comandos Git que possam disparar editores. Se um comando necessitar de intervenção manual, registre o motivo no PR e solicite revisão humana em vez de abrir o editor automaticamente.
+
 ### Uso de MCP Context7 (recomendado)
 
 - Para obter documentação atualizada e exemplos oficiais de bibliotecas críticas do projeto (por exemplo: NestJS, TypeORM, class-transformer, class-validator, RxJS, Jest, ESLint), consulte o servidor MCP Context7 antes de implementar mudanças não triviais.
