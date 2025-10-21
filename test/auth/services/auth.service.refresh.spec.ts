@@ -20,10 +20,16 @@ describe('AuthService.refresh (unit)', () => {
     repo = repositoryMockFactory<RefreshToken>();
 
     usersClient = {
-      validateUser: jest.fn(async () => null),
-      getById: jest.fn(async (id: number) => {
-        if (id === 1) return { id: 1, email: 'ok@example.com', name: 'Ok', roles: ['user'] };
-        return null;
+      validateUser: jest.fn(() => Promise.resolve(null)),
+      getById: jest.fn((id: number) => {
+        if (id === 1)
+          return Promise.resolve({
+            id: 1,
+            email: 'ok@example.com',
+            name: 'Ok',
+            roles: ['user'],
+          });
+        return Promise.resolve(null);
       }),
     };
 
@@ -50,8 +56,12 @@ describe('AuthService.refresh (unit)', () => {
     // repo.find should return the candidate
     repo.find.mockResolvedValue([token]);
     // when creating/saving new token
-    repo.create.mockImplementation((e: any) => ({ ...e }));
-    repo.save.mockImplementation(async (e: any) => ({ id: 2, ...e }));
+    repo.create.mockImplementation((e: Partial<RefreshToken>) => ({
+      ...(e as any),
+    }));
+    repo.save.mockImplementation((e: Partial<any>) =>
+      Promise.resolve({ id: 2, ...(e as any) }),
+    );
 
     const res = await service.refresh(raw, '1.2.3.4', 'jest');
     expect(res).toHaveProperty('accessToken', 'signed-access-token');

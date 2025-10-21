@@ -2,7 +2,9 @@ import { RefreshToken } from '../../src/auth/entities/refresh-token.entity';
 
 let seq = 1;
 
-export function makeRefreshTokenEntity(overrides?: Partial<RefreshToken>): Partial<RefreshToken> {
+export function makeRefreshTokenEntity(
+  overrides?: Partial<RefreshToken>,
+): Partial<RefreshToken> {
   const now = new Date();
   const base: Partial<RefreshToken> = {
     id: seq++,

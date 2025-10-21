@@ -18,10 +18,16 @@ describe('AuthService.me (unit)', () => {
     repo = repositoryMockFactory<RefreshToken>();
 
     usersClient = {
-      validateUser: jest.fn(async () => null),
-      getById: jest.fn(async (id: number) => {
-        if (id === 1) return { id: 1, email: 'ok@example.com', name: 'Ok', roles: ['user'] };
-        return null;
+      validateUser: jest.fn(() => Promise.resolve(null)),
+      getById: jest.fn((id: number) => {
+        if (id === 1)
+          return Promise.resolve({
+            id: 1,
+            email: 'ok@example.com',
+            name: 'Ok',
+            roles: ['user'],
+          });
+        return Promise.resolve(null);
       }),
     };
 

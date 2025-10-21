@@ -18,15 +18,21 @@ describe('AuthService.login (unit)', () => {
     repo = repositoryMockFactory<RefreshToken>();
 
     usersClient = {
-      validateUser: jest.fn(async (email: string, password: string) => {
+      validateUser: jest.fn((email: string, password: string) => {
         if (email === 'ok@example.com' && password === 'secret') {
-          return { id: 1, email, name: 'Ok', roles: ['user'] };
+          return Promise.resolve({ id: 1, email, name: 'Ok', roles: ['user'] });
         }
-        return null;
+        return Promise.resolve(null);
       }),
-      getById: jest.fn(async (id: number) => {
-        if (id === 1) return { id: 1, email: 'ok@example.com', name: 'Ok', roles: ['user'] };
-        return null;
+      getById: jest.fn((id: number) => {
+        if (id === 1)
+          return Promise.resolve({
+            id: 1,
+            email: 'ok@example.com',
+            name: 'Ok',
+            roles: ['user'],
+          });
+        return Promise.resolve(null);
       }),
     };
 
@@ -48,11 +54,20 @@ describe('AuthService.login (unit)', () => {
 
   it('login should return access and refresh for valid credentials', async () => {
     // repo.save should return the saved entity with id
-    repo.save.mockImplementation(async (e: any) => ({ id: 1, ...e }));
-    repo.create.mockImplementation((e: any) => ({ ...e }));
+    repo.save.mockImplementation((e: Partial<any>) =>
+      Promise.resolve({ id: 1, ...(e as any) }),
+    );
+    repo.create.mockImplementation((e: Partial<RefreshToken>) => ({
+      ...(e as any),
+    }));
     repo.find.mockResolvedValue([]);
 
-    const res = await service.login('ok@example.com', 'secret', '1.2.3.4', 'jest');
+    const res = await service.login(
+      'ok@example.com',
+      'secret',
+      '1.2.3.4',
+      'jest',
+    );
     expect(res).toHaveProperty('accessToken', 'signed-access-token');
     expect(res).toHaveProperty('refreshToken');
     expect(res.user).toMatchObject({ id: 1, email: 'ok@example.com' });

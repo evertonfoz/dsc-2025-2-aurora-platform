@@ -20,8 +20,8 @@ describe('AuthService.logout (unit)', () => {
     repo = repositoryMockFactory<RefreshToken>();
 
     usersClient = {
-      validateUser: jest.fn(async () => null),
-      getById: jest.fn(async () => null),
+      validateUser: jest.fn(() => Promise.resolve(null)),
+      getById: jest.fn(() => Promise.resolve(null)),
     };
 
     jwt = {
@@ -45,7 +45,9 @@ describe('AuthService.logout (unit)', () => {
     const token = makeRefreshTokenEntity({ userId: 1 }) as RefreshToken;
     token.tokenHash = await argon2.hash(raw);
     repo.find.mockResolvedValue([token]);
-    repo.save.mockImplementation(async (e: any) => ({ id: token.id, ...e }));
+    repo.save.mockImplementation((e: Partial<any>) =>
+      Promise.resolve({ id: token.id, ...(e as any) }),
+    );
 
     const r = await service.logout(raw);
     expect(r).toEqual({ revoked: 1 });

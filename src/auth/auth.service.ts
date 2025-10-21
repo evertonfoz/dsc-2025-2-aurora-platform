@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, IsNull } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -19,7 +23,8 @@ function addDays(days: number): Date {
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRepository(RefreshToken) private readonly refreshRepo: Repository<RefreshToken>,
+    @InjectRepository(RefreshToken)
+    private readonly refreshRepo: Repository<RefreshToken>,
     private readonly jwt: JwtService,
     private readonly users: UsersHttpClient,
   ) {}
@@ -29,36 +34,49 @@ export class AuthService {
     return this.jwt.sign({
       sub: user.id,
       email: user.email,
-      roles: user.roles || [],
+      roles: user.roles ?? [],
     });
   }
 
   // Emite um novo refresh (hash persistido) e retorna par {raw, entity}
-  private async issueRefresh(userId: number, ip?: string, userAgent?: string): Promise<{ raw: string; entity: RefreshToken }> {
+  private async issueRefresh(
+    userId: number,
+    ip?: string,
+    userAgent?: string,
+  ): Promise<{ raw: string; entity: RefreshToken }> {
     const raw = crypto.randomBytes(48).toString('base64url'); // ~64+ chars
     const tokenHash = await argon2.hash(raw);
     const entity = this.refreshRepo.create({
       userId,
       tokenHash,
       issuedAt: nowUtc(),
-      expiresAt: addDays(Number(process.env.REFRESH_EXPIRES_DAYS || 7)),
+      expiresAt: addDays(Number(process.env.REFRESH_EXPIRES_DAYS ?? '7')),
       revokedAt: null,
       replacedByTokenId: null,
-      ip: ip || null,
-      userAgent: userAgent || null,
+      ip: ip ?? null,
+      userAgent: userAgent ?? null,
     });
     await this.refreshRepo.save(entity);
     return { raw, entity };
   }
 
   // LOGIN: valida no Users, emite access + refresh
-  async login(email: string, password: string, ip?: string, userAgent?: string) {
+  async login(
+    email: string,
+    password: string,
+    ip?: string,
+    userAgent?: string,
+  ) {
     const user = await this.users.validateUser(email, password);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
     const accessToken = this.signAccess(user);
-    const { raw: refreshToken } = await this.issueRefresh(user.id, ip, userAgent);
+    const { raw: refreshToken } = await this.issueRefresh(
+      user.id,
+      ip,
+      userAgent,
+    );
     return {
       accessToken,
       refreshToken,
@@ -68,7 +86,8 @@ export class AuthService {
 
   // REFRESH: verifica hash, revoga atual, cria novo e retorna novo access+refresh
   async refresh(refreshTokenRaw: string, ip?: string, userAgent?: string) {
-    if (!refreshTokenRaw) throw new BadRequestException('Missing refresh token');
+    if (!refreshTokenRaw)
+      throw new BadRequestException('Missing refresh token');
 
     // Busca candidatos não revogados e não expirados (ordem decrescente)
     const candidates = await this.refreshRepo.find({
@@ -83,10 +102,15 @@ export class AuthService {
         break;
       }
     }
-    if (!current) throw new UnauthorizedException('Invalid or expired refresh token');
+    if (!current)
+      throw new UnauthorizedException('Invalid or expired refresh token');
 
     // Rotação: cria novo e marca o atual como revogado apontando para o novo
-    const { raw: newRaw, entity: newEntity } = await this.issueRefresh(current.userId, ip, userAgent);
+    const { raw: newRaw, entity: newEntity } = await this.issueRefresh(
+      current.userId,
+      ip,
+      userAgent,
+    );
     current.revokedAt = nowUtc();
     current.replacedByTokenId = newEntity.id;
     await this.refreshRepo.save(current);
@@ -129,7 +153,12 @@ export class AuthService {
   async me(userId: number) {
     const user = await this.users.getById(userId);
     if (!user) throw new UnauthorizedException('User not found');
-    return { id: user.id, email: user.email, name: user.name, roles: user.roles || [] };
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      roles: user.roles ?? [],
+    };
   }
 }
 
@@ -139,4 +168,3 @@ Notes:
 - If missing dependency: npm i @nestjs/jwt argon2
 - REFRESH_EXPIRES_DAYS defines refresh TTL (default 7 days).
 */
-
