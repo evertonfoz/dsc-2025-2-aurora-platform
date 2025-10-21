@@ -3,10 +3,7 @@ import { Test } from '@nestjs/testing';
 import { UsersController } from '../../../src/users/users.controller';
 import { UsersService } from '../../../src/users/users.service';
 import { UserRole } from '../../../src/users/enums/user-role.enum';
-import {
-  makeCreateUserDto,
-  makeUserEntity,
-} from '../../factories/user.factory';
+import { makeUserEntity } from '../../factories/user.factory';
 import {
   expectDtoMappedToEntity,
   expectNoSensitiveFields,

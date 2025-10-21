@@ -4,7 +4,6 @@ import { Repository } from 'typeorm';
 import { Event } from '../../../src/events/entities/event.entity';
 import { EventsService } from '../../../src/events/events.service';
 import { repositoryMockFactory, MockType } from '../../mocks/repository.mock';
-import { CreateEventDto } from '../../../src/events/dto/create-event.dto';
 import {
   makeCreateEventDto,
   makeEventEntity,

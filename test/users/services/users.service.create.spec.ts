@@ -5,8 +5,7 @@ import { ConflictException } from '@nestjs/common';
 import { repositoryMockFactory, MockType } from '../../mocks/repository.mock';
 import { User } from '../../../src/users/entities/user.entity';
 import { UsersService } from '../../../src/users/users.service';
-import { UserRole } from '../../../src/users/enums/user-role.enum';
-import { CreateUserDto } from '../../../src/users/dto/create-user.dto';
+// removed unused imports UserRole and CreateUserDto
 import {
   makeCreateUserDto,
   makeUserEntity,

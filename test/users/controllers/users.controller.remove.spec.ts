@@ -2,7 +2,7 @@
 import { Test } from '@nestjs/testing';
 import { UsersController } from '../../../src/users/users.controller';
 import { UsersService } from '../../../src/users/users.service';
-import { expectNoSensitiveFields } from '../../utils/asserts';
+// removed unused import expectNoSensitiveFields
 describe('UsersController – remove', () => {
   let controller: UsersController;
   const service = { remove: jest.fn() };
