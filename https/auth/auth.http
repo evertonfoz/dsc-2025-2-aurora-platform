@@ -1,0 +1,38 @@
+### Environment variables
+@host = http://localhost:3001
+@apiBase = {{host}}/v1
+@token =
+
+### POST /auth/login
+POST {{apiBase}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "ok@example.com",
+  "password": "secret"
+}
+
+### POST /auth/refresh
+POST {{apiBase}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "<paste-refresh-token-here>"
+}
+
+### POST /auth/logout
+POST {{apiBase}}/auth/logout
+Content-Type: application/json
+
+{
+  "refreshToken": "<paste-refresh-token-here>"
+}
+
+### GET /auth/me
+GET {{apiBase}}/auth/me
+Accept: application/json
+Authorization: Bearer {{token}}
+
+# Notes:
+# - Use the login response to obtain accessToken/refreshToken.
+# - For web flows consider storing the refreshToken in an httpOnly cookie.
