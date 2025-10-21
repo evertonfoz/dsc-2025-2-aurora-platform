@@ -222,6 +222,17 @@ expectNoSensitiveFields(res);
 
 Registrar estas regras no guia garante que LLMs apliquem o mesmo padrão reproduzido manualmente neste repositório e evita regressões por duplicação de asserts.
 
+### 8.5 Regra de documentação obrigatória para `events`
+
+Toda alteração relacionada à feature `events` (código, testes, factories, mocks, helpers, e2e/smoke, docs) deve ser descrita no arquivo `test/README.md` antes de abrir o PR. O conteúdo mínimo exigido é:
+
+- Resumo das alterações (arquivos adicionados/alterados/removidos).
+- Instruções para rodar os testes locaismente e dependências necessárias (ex: `docker compose up -d db`).
+- Lista de novas factories/helpers e sua localização em `test/factories` e `test/utils`.
+- Quais testes foram adicionados e como rodá-los seletivamente (comando `npx jest <path>`).
+
+Motivo: ter um ponto único de verdade facilita revisão humana, acelera automações de LLMs e evita perda de contexto ao gerar ou refatorar testes relacionados a `events`.
+
 ### 9. Boas Práticas para Testes
 - Sempre mocke métodos privados e dependências relevantes (ex: hash de senha).
 - Garanta que os testes reflitam o fluxo real do serviço, especialmente para métodos que envolvem lógica adicional (ex: hashing, normalização).
