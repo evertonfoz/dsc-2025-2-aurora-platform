@@ -8,6 +8,7 @@ import { EventVisibility } from '../../../src/events/enums/event-visibility.enum
 import { repositoryMockFactory, MockType } from '../../mocks/repository.mock';
 import { CreateEventDto } from '../../../src/events/dto/create-event.dto';
 import { UpdateEventDto } from '../../../src/events/dto/update-event.dto';
+import { makeCreateEventDto, makeEventEntity } from '../../factories/event.factory';
 
 describe('EventsService', () => {
   let service: EventsService;
@@ -34,19 +35,12 @@ describe('EventsService', () => {
 
   describe('create', () => {
     it('creates an event with valid dates and owner', async () => {
-      const dto: Partial<CreateEventDto> = {
-        title: 'My Event',
-        summary: 'Summ',
-        description: 'Desc',
-        startsAt: new Date(Date.now() + 1000 * 60).toISOString(),
-        endsAt: new Date(Date.now() + 1000 * 60 * 60).toISOString(),
-      };
-
-      const saved = { id: 1, ...dto, slug: 'my-event', state: EventState.DRAFT };
+      const dto = makeCreateEventDto({ title: 'My Event', summary: 'Summ', description: 'Desc' });
+      const saved = makeEventEntity({ id: 1, slug: 'my-event', ...dto } as any) as any;
 
       repository.findOne.mockResolvedValue(undefined); // ensureUniqueSlug
-      repository.create.mockReturnValue(saved as any);
-      repository.save.mockResolvedValue(saved as any);
+      repository.create.mockReturnValue(saved);
+      repository.save.mockResolvedValue(saved);
 
       const result = await service.create(dto as CreateEventDto, 123);
 
