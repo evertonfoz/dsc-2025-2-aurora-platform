@@ -39,10 +39,17 @@ Este guia foi elaborado a partir de um fluxo real de desenvolvimento, desde o en
 
 
 ### 8. Organize os Testes em Subpastas controllers/ e services/
-- Crie subpastas `controllers/` e `services/` dentro de `test/users/`.
-- Cada método principal deve ter seu próprio arquivo de teste, por exemplo:
+Crie subpastas `controllers/` e `services/` dentro de `test/<feature>/` (ex: `test/users/`, `test/events/`).
+- Organização recomendada:
+  - `test/<feature>/controllers/` — specs dos controllers (cada rota/método com arquivo próprio quando fizer sentido)
+  - `test/<feature>/services/` — specs das unidades de negócio (cada ação importante em arquivo separado)
+
+- Cada método principal deve ter seu próprio arquivo de teste quando isso melhorar clareza e manutenção. Exemplos de arquivos:
   - `test/users/services/users.service.create.spec.ts`
   - `test/users/controllers/users.controller.findOne.spec.ts`
+  - `test/events/services/events.service.create.spec.ts`
+  - `test/events/services/events.service.findOne.spec.ts`
+  - `test/events/controllers/events.controller.find.spec.ts`
 - Ajuste os imports relativos conforme a estrutura de pastas.
 - Remova arquivos antigos/unificados após a migração para a estrutura modular.
 
