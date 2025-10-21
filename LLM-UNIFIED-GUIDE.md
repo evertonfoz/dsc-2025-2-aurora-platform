@@ -39,12 +39,199 @@ Este guia foi elaborado a partir de um fluxo real de desenvolvimento, desde o en
 
 
 ### 8. Organize os Testes em Subpastas controllers/ e services/
-- Crie subpastas `controllers/` e `services/` dentro de `test/users/`.
-- Cada método principal deve ter seu próprio arquivo de teste, por exemplo:
+Crie subpastas `controllers/` e `services/` dentro de `test/<feature>/` (ex: `test/users/`, `test/events/`).
+- Organização recomendada:
+  - `test/<feature>/controllers/` — specs dos controllers (cada rota/método com arquivo próprio quando fizer sentido)
+  - `test/<feature>/services/` — specs das unidades de negócio (cada ação importante em arquivo separado)
+
+- Cada método principal deve ter seu próprio arquivo de teste quando isso melhorar clareza e manutenção. Exemplos de arquivos:
   - `test/users/services/users.service.create.spec.ts`
   - `test/users/controllers/users.controller.findOne.spec.ts`
+  - `test/events/services/events.service.create.spec.ts`
+  - `test/events/services/events.service.findOne.spec.ts`
+  - `test/events/controllers/events.controller.find.spec.ts`
 - Ajuste os imports relativos conforme a estrutura de pastas.
 - Remova arquivos antigos/unificados após a migração para a estrutura modular.
+
+### 8.1 Convenção de localização de testes
+
+- Todos os testes unitários e de integração deste repositório devem residir sob a pasta `test/` na raiz do projeto.
+- Estrutura recomendada por domínio (ex: events, users):
+  - `test/events/events.service.spec.ts`
+  - `test/events/events.controller.spec.ts`
+  - `test/users/services/users.service.create.spec.ts`
+- Evite colocar arquivos `*.spec.ts` dentro de `src/` — isso facilita distinção entre código de produção e testes e alinha com a configuração Jest usada neste projeto.
+- Ao mover testes para `test/`, ajuste os imports relativos para apontarem para `../../src/...` quando necessário.
+
+Exemplo rápido de import em `test/events/events.service.spec.ts`:
+
+```ts
+import { EventsService } from '../../src/events/events.service';
+import { Event } from '../../src/events/entities/event.entity';
+```
+
+Adicione este padrão à checklist do PR (ex: "[x] Testes colocados em `test/` conforme convenção").
+
+### 8.2 Padrão detalhado para testes (para LLMs e contribuidores)
+
+Este projeto segue um padrão consistente para testes que facilita manutenção, reuso de mocks e execução em CI. Registre e siga esse padrão sempre que gerar ou mover testes.
+
+- Localização:
+  - Todos os testes devem ficar em `test/` na raiz do repositório.
+  - Separe por domínio/feature: `test/<feature>/controllers` e `test/<feature>/services`.
+
+- Nome dos arquivos:
+  - Use `*.spec.ts` e nomes descritivos: `events.service.spec.ts`, `users.controller.findOne.spec.ts`.
+  - Para múltiplos casos do mesmo método, prefira sufixos: `users.service.create.spec.ts`, `users.service.remove.spec.ts`.
+
+- Mocks e fábricas:
+  - Centralize mocks reutilizáveis em `test/mocks/`.
+  - Use a fábrica `repositoryMockFactory` para mocks de `Repository<T>` (já presente em `test/mocks/repository.mock.ts`). Exemplo:
+
+```ts
+import { repositoryMockFactory, MockType } from '../../mocks/repository.mock';
+import { getRepositoryToken } from '@nestjs/typeorm';
+
+providers: [
+  YourService,
+  { provide: getRepositoryToken(YourEntity), useFactory: repositoryMockFactory },
+],
+```
+
+- Imports de testes:
+  - Ao importar código de produção desde `test/`, use caminhos relativos para `src`, por exemplo:
+
+```ts
+import { EventsService } from '../../src/events/events.service';
+import { Event } from '../../src/events/entities/event.entity';
+```
+
+- Testes unitários vs testes de integração:
+  - Tests unitários: use mocks (test/mocks) e coloque em `test/<feature>/services` ou `test/<feature>/controllers`.
+  - Tests de integração / smoke que usam DB real: coloque em `test/smoke/` ou `test/integration/` e documente dependências (ex: docker-compose up -d db).
+
+- Convenções de estilo nos testes:
+  - Use `describe` e `it` com strings descritivas em português claro (ou inglês quando o PR for internacional).
+  - Limpe mocks entre testes com `jest.clearAllMocks()` quando necessário.
+  - Feche módulos Nest em testes de integração: `await moduleRef.close();`.
+
+- Checklist para PRs que alteram/ adicionam testes (adicionar ao template do PR):
+
+```
+- [ ] Testes adicionados em `test/` com estrutura `controllers/` e `services/`.
+- [ ] Usado `test/mocks/repository.mock.ts` quando mockando repositórios TypeORM.
+- [ ] `npm run lint` rodado sem erros (ou justificativa no PR se precisar de exceção).
+- [ ] `npm test` — todos os testes unitários passaram localmente.
+- [ ] Se houver testes que usam DB, documentar como rodar (comandos docker-compose) no PR.
+```
+
+Seguindo esse padrão, os LLMs e contribuidores manterão consistência com o restante do repositório e evitarão testes espalhados dentro de `src/`.
+
+### 8.3 Padrão de Factories de Teste
+
+Para reduzir duplicação e aumentar a clareza dos specs, adote factories de teste em `test/factories/` para cada domínio principal (ex: `event.factory.ts`, `user.factory.ts`).
+
+- O que colocar na factory:
+  - helpers para criar DTOs (ex: `makeCreateEventDto(overrides?)`) que retornam tipos dos DTOs usados pelos controllers/services.
+  - helpers para criar entidades (`makeEventEntity(overrides?)`) que retornam objetos compatíveis com as entidades do TypeORM (úteis para mocks do repositório).
+
+- Contrato das factories:
+  - Inputs: `Partial<T>` (overrides) para customizar valores em cada teste.
+  - Outputs: objetos tipados (`CreateEventDto`, `Partial<Event>`, etc.) prontos para uso em testes.
+
+- Nome e localização:
+  - `test/factories/<feature>.factory.ts` (ex: `test/factories/event.factory.ts`).
+  - Expor funções `makeCreateXxxDto`, `makeXxxEntity`.
+
+- Boas práticas:
+  - Forneça valores padrão válidos (p.ex. datas em ISO quando DTO espera string, enums válidos).
+  - Permita overrides para casos específicos.
+  - Use `Partial<T>` para inputs nos factories para garantir tipagem.
+  - Evite lógica complexa na factory; mantenha-a previsível.
+
+- Exemplo mínimo (para events):
+
+```ts
+// test/factories/event.factory.ts
+import { CreateEventDto } from '../../src/events/dto/create-event.dto';
+import { Event } from '../../src/events/entities/event.entity';
+
+export function makeCreateEventDto(overrides?: Partial<CreateEventDto>): CreateEventDto { /* ... */ }
+export function makeEventEntity(overrides?: Partial<Event>): Partial<Event> { /* ... */ }
+```
+
+- Quando usar factories nos specs:
+  - Em services: criar entidades retornadas pelo repositório e DTOs recebidos pelos métodos.
+  - Em controllers: usar DTOs para requisições e entidades/DTOs para valores retornados pelo service.
+
+- Checklist ao adicionar factories a um PR:
+
+```
+- [ ] Factory criada em `test/factories/` com função `makeCreateXxxDto` e `makeXxxEntity`.
+- [ ] Specs atualizados para consumir a factory (evitar objetos inline repetidos).
+- [ ] Testes locais rodaram (`npm test`) e passaram.
+- [ ] Não há dependências pesadas dentro da factory (ex: acesso a DB ou chamadas de rede).
+```
+
+Adicionar esta seção ao `LLM-UNIFIED-GUIDE.md` ajudará LLMs e humanos a seguir um padrão consistente ao gerar testes automaticamente.
+
+### 8.4 Padrão de Helpers / Utils de Teste
+
+Além de factories e mocks, use helpers (utils) para reduzir duplicação nos specs e para centralizar assert checks que reaparecem entre controllers e services.
+
+- Localização e naming:
+  - Crie `test/utils/` para helpers genéricos (ex: `asserts.ts`, `date.ts`, `enums.ts`).
+  - Exporte funções nomeadas de forma clara: `expectDtoMappedToEntity`, `expectNoSensitiveFields`, `normalizeDateForAssert`.
+
+- O que deve conter um helper de asserts (`test/utils/asserts.ts`):
+  - Funções que comparam DTO ↔ Entity por chaves selecionadas, tratando diferenças comuns (Date <-> ISO string) de forma previsível.
+  - Funções que verificam ausência de campos sensíveis (`passwordHash`, `secret`) em objetos retornados por controllers.
+  - Helpers leves — evite lógica complexa, IO, ou acesso a DB dentro de `test/utils`.
+
+- Como o LLM deve usar helpers ao gerar ou refatorar tests:
+  1. Ao gerar um controller spec, importe e use `expectDtoMappedToEntity` para comparar os campos essenciais entre resposta e factory/entity.
+ 2. Ao gerar/ajustar um spec que verifica remoção/retorno de usuário, use `expectNoSensitiveFields` em vez de asserts manuais repetidos.
+ 3. Sempre adicione novos helpers em `test/utils/` quando detectar padrões repetidos em >2 specs.
+
+- Regras para arquivos combinados / duplicados:
+  - Prefira specs modularizados (um método/arquivo por spec) em `test/<feature>/controllers` e `test/<feature>/services`.
+  - Se encontrar arquivos combinados antigos (ex: `events.service.spec.ts` contendo muitos describes), o LLM deve:
+    1. Dividir o spec em arquivos por método (ex: `events.service.create.spec.ts`, `events.service.findOne.spec.ts`, ...).
+    2. Atualizar imports relativos e garantir que factories/mocks apontem para `../../factories` e `../../mocks` conforme necessário.
+    3. Remover o arquivo combinado antigo apenas depois de confirmar que os novos arquivos passam localmente.
+
+- Exemplo (uso mínimo em controller spec):
+
+```ts
+import { expectDtoMappedToEntity, expectNoSensitiveFields } from '../../utils/asserts';
+// ...
+const res = await controller.findOne('42');
+expectDtoMappedToEntity({ id: 42, name: 'Grace' }, res, ['id','name']);
+expectNoSensitiveFields(res);
+```
+
+- Checklist para PRs envolvendo helpers/refactor de specs:
+
+```
+- [ ] Novos helpers adicionados só em `test/utils/` e documentados (arquivo com JSDoc curto)
+- [ ] Specs refatorados para importar helpers ao invés de duplicar asserts
+- [ ] Arquivos combinados antigos (se existiam) foram removidos apenas após novos specs passarem localmente
+- [ ] Rodei `npm run lint` e `npm test` — todos os specs relevantes passaram localmente
+- [ ] Não adicionei IO/DB/network nos helpers; são funções puras
+```
+
+Registrar estas regras no guia garante que LLMs apliquem o mesmo padrão reproduzido manualmente neste repositório e evita regressões por duplicação de asserts.
+
+### 8.5 Regra de documentação obrigatória para `events`
+
+Toda alteração relacionada à feature `events` (código, testes, factories, mocks, helpers, e2e/smoke, docs) deve ser descrita no arquivo `test/README.md` antes de abrir o PR. O conteúdo mínimo exigido é:
+
+- Resumo das alterações (arquivos adicionados/alterados/removidos).
+- Instruções para rodar os testes locaismente e dependências necessárias (ex: `docker compose up -d db`).
+- Lista de novas factories/helpers e sua localização em `test/factories` e `test/utils`.
+- Quais testes foram adicionados e como rodá-los seletivamente (comando `npx jest <path>`).
+
+Motivo: ter um ponto único de verdade facilita revisão humana, acelera automações de LLMs e evita perda de contexto ao gerar ou refatorar testes relacionados a `events`.
 
 ### 9. Boas Práticas para Testes
 - Sempre mocke métodos privados e dependências relevantes (ex: hash de senha).
@@ -113,6 +300,17 @@ Adicione informações relevantes, links ou anexos.
 - **Interaja de forma iterativa**: Implemente, teste, corrija, documente, valide.
 - **Peça explicações e exemplos sempre que necessário**.
 - **Use o Copilot Chat como parceiro ativo, não apenas executor.**
+
+### Evitar editores interativos (IMPORTANTE)
+
+Ao executar comandos Git ou scripts automatizados, NUNCA abra editores interativos (por exemplo: vi, vim, nano) que aguardem entrada do usuário. Em ambientes automatizados e em interações com LLMs, use sempre modos não-interativos e flags que evitem prompts. Exemplos recomendados:
+
+- Para merges automáticos: `git merge --no-ff --no-edit origin/main`
+- Para commits programáticos: `git commit -m "mensagem"` (evite `git commit` sem `-m`)
+- Para rebase sem editor: `GIT_SEQUENCE_EDITOR=":wq" git rebase origin/main` ou usar `git rebase --autosquash --autostash --no-edit` quando aplicável
+- Definir variável temporária para evitar editores: `GIT_MERGE_AUTOEDIT=no` ou `GIT_EDITOR=true` (dependendo do caso)
+
+Adicione essa verificação ao checklist do PR quando um script/LLM executar comandos Git que possam disparar editores. Se um comando necessitar de intervenção manual, registre o motivo no PR e solicite revisão humana em vez de abrir o editor automaticamente.
 
 ### Uso de MCP Context7 (recomendado)
 
