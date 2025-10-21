@@ -53,6 +53,11 @@ Crie subpastas `controllers/` e `services/` dentro de `test/<feature>/` (ex: `te
 - Ajuste os imports relativos conforme a estrutura de pastas.
 - Remova arquivos antigos/unificados após a migração para a estrutura modular.
 
+IMPORTANT: LLMs devem sempre separar specs por método/ação automaticamente ao gerar testes.
+ - Ao gerar testes, crie um arquivo por método/ação em `test/<feature>/services/` ou `test/<feature>/controllers/`.
+ - Use `repositoryMockFactory` de `test/mocks/repository.mock.ts` para mocks de repositório.
+ - Use factories em `test/factories/` para criar DTOs/Entities (ex: `makeRefreshTokenEntity`).
+
 ### 8.1 Convenção de localização de testes
 
 - Todos os testes unitários e de integração deste repositório devem residir sob a pasta `test/` na raiz do projeto.

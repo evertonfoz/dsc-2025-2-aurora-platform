@@ -49,8 +49,8 @@ describe('EventsController – find', () => {
     const res = await controller.findOne('5');
 
     expect(service.findOneByIdOrSlug).toHaveBeenCalledWith(5);
-  // only assert the id to avoid comparing full entity (timestamps and generated fields)
-  expect(res).toMatchObject({ id: 5 });
+    // only assert the id to avoid comparing full entity (timestamps and generated fields)
+    expect(res).toMatchObject({ id: 5 });
   });
 
   it('GET /events/:idOrSlug slug → delega findOneByIdOrSlug com slug', async () => {
@@ -60,7 +60,7 @@ describe('EventsController – find', () => {
     const res = await controller.findOne('my-slug');
 
     expect(service.findOneByIdOrSlug).toHaveBeenCalledWith('my-slug');
-  // only assert the id to avoid comparing full entity (timestamps and generated fields)
-  expect(res).toMatchObject({ id: 6 });
+    // only assert the id to avoid comparing full entity (timestamps and generated fields)
+    expect(res).toMatchObject({ id: 6 });
   });
 });
