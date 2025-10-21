@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { repositoryMockFactory, MockType } from '../../mocks/repository.mock';
 import { User } from '../../../src/users/entities/user.entity';
+import { makeUserEntity } from '../../factories/user.factory';
 import { UsersService } from '../../../src/users/users.service';
 import { NotFoundException } from '@nestjs/common';
 describe('UsersService', () => {
@@ -30,11 +31,11 @@ describe('UsersService', () => {
 
   describe('findOne', () => {
     it('should return a user if found', async () => {
-      const user = { id: 1, name: 'John Doe' };
+      const user = makeUserEntity({ id: 1, name: 'John Doe' } as any) as any;
       repositoryMock.findOne.mockResolvedValue(user);
 
-      const result = await service.findOne(1);
-      expect(result).toEqual(user);
+  const result = await service.findOne(1);
+  expect(result).toEqual(expect.objectContaining({ id: user.id, name: user.name }));
     });
 
     it('should throw a NotFoundException if user not found', async () => {

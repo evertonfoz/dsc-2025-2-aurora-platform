@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { UsersController } from '../../../src/users/users.controller';
 import { UsersService } from '../../../src/users/users.service';
 import { UserRole } from '../../../src/users/enums/user-role.enum';
+import { makeUserEntity } from '../../factories/user.factory';
 describe('UsersController – findOne', () => {
   let controller: UsersController;
   const service = { findOne: jest.fn() };
@@ -17,26 +18,11 @@ describe('UsersController – findOne', () => {
   });
 
   it('GET /users/:id → delega ao service.findOne e retorna o usuário mapeado para DTO', async () => {
-    const user = {
-      id: 42,
-      name: 'Grace Hopper',
-      email: 'grace@navy.mil',
-      passwordHash: 'hash',
-      role: UserRole.ADMIN,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isActive: true,
-    };
+    const user = makeUserEntity({ id: 42, name: 'Grace Hopper', email: 'grace@navy.mil', role: UserRole.ADMIN } as any) as any;
     service.findOne.mockResolvedValue(user);
     const res = await controller.findOne('42');
     expect(service.findOne).toHaveBeenCalledWith(42);
-    expect(res).toMatchObject({
-      id: 42,
-      name: 'Grace Hopper',
-      email: 'grace@navy.mil',
-      role: UserRole.ADMIN,
-      isActive: true,
-    });
+    expect(res).toMatchObject({ id: 42, name: 'Grace Hopper', email: 'grace@navy.mil', role: UserRole.ADMIN, isActive: true });
     expect(res).not.toHaveProperty('passwordHash');
   });
 
