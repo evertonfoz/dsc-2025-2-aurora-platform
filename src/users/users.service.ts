@@ -134,4 +134,15 @@ export class UsersService {
     const saved = await this.repo.save(user);
     return this.stripSensitive(saved);
   }
+
+  // Valida credenciais (usado pelo AuthService via HTTP validate endpoint)
+  async validateCredentials(email: string, password: string) {
+    const normalized = this.normalizeEmail(email);
+    const user = await this.repo.findOne({ where: { email: normalized } });
+    if (!user) return null;
+    const pepper = process.env.HASH_PEPPER ?? '';
+    const valid = await bcrypt.compare(password + pepper, user.passwordHash);
+    if (!valid) return null;
+    return { id: user.id, email: user.email, name: user.name, roles: [user.role] };
+  }
 }

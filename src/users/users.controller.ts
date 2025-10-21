@@ -27,6 +27,7 @@ import { plainToInstance } from 'class-transformer';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ValidateUserDto } from './dto/validate-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
 import { UserRole } from './enums/user-role.enum';
@@ -127,6 +128,13 @@ export class UsersController {
     return plainToInstance(UserResponseDto, user, {
       excludeExtraneousValues: true,
     });
+  }
+
+  @Post('validate')
+  async validate(@Body() dto: ValidateUserDto) {
+    const identity = await this.users.validateCredentials(dto.email, dto.password);
+    if (!identity) return null;
+    return identity;
   }
 
   @Get()
