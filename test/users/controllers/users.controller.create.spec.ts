@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { UsersController } from '../../../src/users/users.controller';
 import { UsersService } from '../../../src/users/users.service';
 import { UserRole } from '../../../src/users/enums/user-role.enum';
+import { makeCreateUserDto, makeUserEntity } from '../../factories/user.factory';
 describe('UsersController – create', () => {
   let controller: UsersController;
   const service = { create: jest.fn() };
@@ -17,13 +18,9 @@ describe('UsersController – create', () => {
   });
 
   it('POST /users → delega ao service.create', async () => {
-    const body = {
-      name: 'Ada',
-      email: 'ada@mail.com',
-      password: 'x',
-      role: UserRole.TEACHER,
-    };
-    service.create.mockResolvedValue({ id: 1, ...body });
+    const body = makeCreateUserDto({ role: UserRole.TEACHER });
+    const saved = makeUserEntity({ id: 1, ...body } as any) as any;
+    service.create.mockResolvedValue(saved);
     await controller.create(body as any);
     expect(service.create).toHaveBeenCalledWith(body);
   });
