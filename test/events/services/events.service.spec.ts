@@ -6,6 +6,8 @@ import { EventsService } from '../../../src/events/events.service';
 import { EventState } from '../../../src/events/enums/event-state.enum';
 import { EventVisibility } from '../../../src/events/enums/event-visibility.enum';
 import { repositoryMockFactory, MockType } from '../../mocks/repository.mock';
+import { CreateEventDto } from '../../../src/events/dto/create-event.dto';
+import { UpdateEventDto } from '../../../src/events/dto/update-event.dto';
 
 describe('EventsService', () => {
   let service: EventsService;
@@ -32,7 +34,7 @@ describe('EventsService', () => {
 
   describe('create', () => {
     it('creates an event with valid dates and owner', async () => {
-      const dto: any = {
+      const dto: Partial<CreateEventDto> = {
         title: 'My Event',
         summary: 'Summ',
         description: 'Desc',
@@ -46,7 +48,7 @@ describe('EventsService', () => {
       repository.create.mockReturnValue(saved as any);
       repository.save.mockResolvedValue(saved as any);
 
-      const result = await service.create(dto, 123);
+      const result = await service.create(dto as CreateEventDto, 123);
 
       expect(repository.create).toHaveBeenCalled();
       expect(repository.save).toHaveBeenCalled();
@@ -110,15 +112,15 @@ describe('EventsService', () => {
       repository.findOneBy.mockResolvedValue(existing as any);
       repository.save.mockResolvedValue({ ...existing, title: 'updated' } as any);
 
-      const result = await service.update(5, { title: 'updated' } as any, { id: 7, isAdmin: false });
+  const result = await service.update(5, { title: 'updated' } as UpdateEventDto, { id: 7, isAdmin: false });
       expect(repository.findOneBy).toHaveBeenCalledWith({ id: 5 });
       expect(result.title).toBe('updated');
     });
 
     it('throws Forbidden when requester is not owner', async () => {
       const existing: any = { id: 6, ownerUserId: 99, startsAt: new Date(), endsAt: new Date(Date.now() + 1000 * 60 * 60) };
-      repository.findOneBy.mockResolvedValue(existing as any);
-      await expect(service.update(6, { title: 'x' } as any, { id: 1, isAdmin: false })).rejects.toThrow('Access denied');
+  repository.findOneBy.mockResolvedValue(existing as any);
+  await expect(service.update(6, { title: 'x' } as UpdateEventDto, { id: 1, isAdmin: false })).rejects.toThrow('Access denied');
     });
   });
 
