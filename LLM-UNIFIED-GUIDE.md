@@ -46,6 +46,25 @@ Este guia foi elaborado a partir de um fluxo real de desenvolvimento, desde o en
 - Ajuste os imports relativos conforme a estrutura de pastas.
 - Remova arquivos antigos/unificados após a migração para a estrutura modular.
 
+### 8.1 Convenção de localização de testes
+
+- Todos os testes unitários e de integração deste repositório devem residir sob a pasta `test/` na raiz do projeto.
+- Estrutura recomendada por domínio (ex: events, users):
+  - `test/events/events.service.spec.ts`
+  - `test/events/events.controller.spec.ts`
+  - `test/users/services/users.service.create.spec.ts`
+- Evite colocar arquivos `*.spec.ts` dentro de `src/` — isso facilita distinção entre código de produção e testes e alinha com a configuração Jest usada neste projeto.
+- Ao mover testes para `test/`, ajuste os imports relativos para apontarem para `../../src/...` quando necessário.
+
+Exemplo rápido de import em `test/events/events.service.spec.ts`:
+
+```ts
+import { EventsService } from '../../src/events/events.service';
+import { Event } from '../../src/events/entities/event.entity';
+```
+
+Adicione este padrão à checklist do PR (ex: "[x] Testes colocados em `test/` conforme convenção").
+
 ### 9. Boas Práticas para Testes
 - Sempre mocke métodos privados e dependências relevantes (ex: hash de senha).
 - Garanta que os testes reflitam o fluxo real do serviço, especialmente para métodos que envolvem lógica adicional (ex: hashing, normalização).
