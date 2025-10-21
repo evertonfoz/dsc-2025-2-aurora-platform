@@ -18,11 +18,13 @@ export class UsersHttpClient {
   ): Promise<UsersIdentity | null> {
     // Ajuste para seu Users Service real (endpoint/rota)
     try {
-      const { data } = await axios.post<UsersIdentity>(
-        `${this.baseUrl}/users/validate`,
-        { email, password },
-      );
-      return data?.id ? data : null;
+      const res = await axios.post(`${this.baseUrl}/users/validate`, {
+        email,
+        password,
+      });
+      // Accept both plain UsersIdentity or wrapped { data: UsersIdentity }
+      const payload = (res.data && (res.data.data ?? res.data)) as any;
+      return payload?.id ? payload : null;
     } catch {
       return null;
     }
@@ -30,10 +32,9 @@ export class UsersHttpClient {
 
   async getById(userId: number): Promise<UsersIdentity | null> {
     try {
-      const { data } = await axios.get<UsersIdentity>(
-        `${this.baseUrl}/users/${userId}`,
-      );
-      return data?.id ? data : null;
+      const res = await axios.get(`${this.baseUrl}/users/${userId}`);
+      const payload = (res.data && (res.data.data ?? res.data)) as any;
+      return payload?.id ? payload : null;
     } catch {
       return null;
     }
