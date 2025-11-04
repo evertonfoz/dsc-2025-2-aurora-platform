@@ -488,3 +488,18 @@ Colocar estas regras no fluxo de geração de código reduzirá regressões por 
 - Include `Accept: application/json` and `Authorization: Bearer {{token}}` headers where appropriate.
 
 Add the `https/http-template.http` to new feature branches when creating new HTTP examples and document the usage in the PR body so reviewers can validate the requests quickly.
+
+### 12. Checklist rápido (LLM) — Evitar erros de lint/typing antes de abrir PR
+
+Ao gerar código automaticamente, o LLM deve executar/verificar mentalmente os itens abaixo e incluí-los no corpo do PR como checklist:
+
+- [ ] Tipar chamadas HTTP externas (usar generics do axios: `axios.get<T>()` / `axios.post<T>()`) ou validar com zod/ajv.
+- [ ] Evitar `any` e `as any`; quando necessário, usar `Partial<T>` ou `as unknown as T` com justificativa.
+- [ ] Não deixar `catch (e)` sem uso — prefira `catch (_e)` ou `catch {}` quando for ignorar o erro.
+- [ ] Remover imports não usados gerados automaticamente.
+- [ ] Rodar `npm run lint` localmente e garantir que não haja *erros* (warnings idealmente corrigidos também).
+- [ ] Rodar `npm test` e confirmar que os testes unitários passam localmente.
+- [ ] Garantir que mudanças que alterem infra/dev config estejam documentadas e isoladas (não misturar dev/prod em mesmo arquivo sem justificar).
+- [ ] Evitar `eslint-disable` globais; só usar `// eslint-disable-next-line` com breve justificativa na linha acima.
+
+Incluir este checklist no corpo do PR ajuda revisores humanos e garante que o pipeline CI não bloqueie o merge por problemas previsíveis.
