@@ -27,15 +27,19 @@ describe('UsersController – findAll', () => {
       role: UserRole.ADMIN,
       is_active: true,
     };
-    const user: Partial<import('../../../src/users/entities/user.entity').User> = makeUserEntity();
+    const user: Partial<
+      import('../../../src/users/entities/user.entity').User
+    > = makeUserEntity();
     service.findAll.mockResolvedValue({
       data: [user],
       total: 1,
       page: 2,
       limit: 5,
     });
-  const res = await controller.findAll(query as unknown as PaginationQueryDto);
-  expect(service.findAll).toHaveBeenCalledWith(query);
+    const res = await controller.findAll(
+      query as unknown as PaginationQueryDto,
+    );
+    expect(service.findAll).toHaveBeenCalledWith(query);
     // Compare essential pagination fields and that returned data contains expected user
     expect(res).toEqual(
       expect.objectContaining({ total: 1, page: 2, limit: 5 }),

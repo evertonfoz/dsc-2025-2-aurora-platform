@@ -43,8 +43,10 @@ describe('EventsController – find', () => {
   });
 
   it('GET /events/:idOrSlug numeric → delega findOneByIdOrSlug com number', async () => {
-  const e5 = makeEventEntity({ id: 5 });
-  (service.findOneByIdOrSlug as jest.Mock).mockResolvedValue(e5 as unknown as import('../../../src/events/entities/event.entity').Event);
+    const e5 = makeEventEntity({ id: 5 });
+    (service.findOneByIdOrSlug as jest.Mock).mockResolvedValue(
+      e5 as unknown as import('../../../src/events/entities/event.entity').Event,
+    );
 
     const res = await controller.findOne('5');
 
@@ -54,8 +56,10 @@ describe('EventsController – find', () => {
   });
 
   it('GET /events/:idOrSlug slug → delega findOneByIdOrSlug com slug', async () => {
-  const e6 = makeEventEntity({ id: 6 });
-  (service.findOneByIdOrSlug as jest.Mock).mockResolvedValue(e6 as unknown as import('../../../src/events/entities/event.entity').Event);
+    const e6 = makeEventEntity({ id: 6 });
+    (service.findOneByIdOrSlug as jest.Mock).mockResolvedValue(
+      e6 as unknown as import('../../../src/events/entities/event.entity').Event,
+    );
 
     const res = await controller.findOne('my-slug');
 

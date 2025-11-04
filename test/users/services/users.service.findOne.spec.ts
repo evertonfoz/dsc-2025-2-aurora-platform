@@ -31,8 +31,10 @@ describe('UsersService', () => {
 
   describe('findOne', () => {
     it('should return a user if found', async () => {
-  const user: Partial<import('../../../src/users/entities/user.entity').User> = makeUserEntity({ id: 1, name: 'John Doe' });
-  repositoryMock.findOne.mockResolvedValue(user);
+      const user: Partial<
+        import('../../../src/users/entities/user.entity').User
+      > = makeUserEntity({ id: 1, name: 'John Doe' });
+      repositoryMock.findOne.mockResolvedValue(user);
 
       const result = await service.findOne(1);
       expect(result).toEqual(

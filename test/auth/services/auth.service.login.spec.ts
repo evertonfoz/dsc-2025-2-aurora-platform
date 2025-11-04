@@ -57,7 +57,9 @@ describe('AuthService.login (unit)', () => {
     repo.save.mockImplementation((e: Partial<RefreshToken>) =>
       Promise.resolve(Object.assign({ id: 1 }, e) as RefreshToken),
     );
-    repo.create.mockImplementation((e: Partial<RefreshToken>) => Object.assign({}, e) as RefreshToken);
+    repo.create.mockImplementation(
+      (e: Partial<RefreshToken>) => Object.assign({}, e) as RefreshToken,
+    );
     repo.find.mockResolvedValue([]);
 
     const res = await service.login(

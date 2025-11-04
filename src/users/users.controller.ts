@@ -132,7 +132,10 @@ export class UsersController {
 
   @Post('validate')
   async validate(@Body() dto: ValidateUserDto) {
-    const identity = await this.users.validateCredentials(dto.email, dto.password);
+    const identity = await this.users.validateCredentials(
+      dto.email,
+      dto.password,
+    );
     if (!identity) return null;
     return identity;
   }

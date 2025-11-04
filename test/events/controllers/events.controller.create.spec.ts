@@ -25,17 +25,23 @@ describe('EventsController – create', () => {
 
   it('POST /events → delega ao service.create e retorna o evento criado', async () => {
     const body = makeCreateEventDto();
-  const saved = makeEventEntity({ id: 1 });
-  saved.title = body.title;
-  (service.create as jest.Mock).mockResolvedValue(saved as import('../../../src/events/entities/event.entity').Event);
+    const saved = makeEventEntity({ id: 1 });
+    saved.title = body.title;
+    (service.create as jest.Mock).mockResolvedValue(
+      saved as import('../../../src/events/entities/event.entity').Event,
+    );
 
     const res = await controller.create(body, 123);
 
-  expect(service.create).toHaveBeenCalledWith(expect.objectContaining({ title: body.title }), 123);
-    expectDtoMappedToEntity({ id: 1, title: body.title } as Partial<Record<string, unknown>>, res as unknown as Record<string, unknown>, [
-      'id',
-      'title',
-    ]);
+    expect(service.create).toHaveBeenCalledWith(
+      expect.objectContaining({ title: body.title }),
+      123,
+    );
+    expectDtoMappedToEntity(
+      { id: 1, title: body.title } as Partial<Record<string, unknown>>,
+      res as unknown as Record<string, unknown>,
+      ['id', 'title'],
+    );
     expectNoSensitiveFields(res as unknown as Record<string, unknown>);
   });
 });

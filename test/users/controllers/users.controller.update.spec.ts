@@ -28,7 +28,9 @@ describe('UsersController – update', () => {
       password: 'novaSenha',
       role: UserRole.TEACHER,
     };
-    const updatedUser: Partial<import('../../../src/users/entities/user.entity').User> = makeUserEntity({
+    const updatedUser: Partial<
+      import('../../../src/users/entities/user.entity').User
+    > = makeUserEntity({
       id: 7,
       name: 'Alan Turing',
       email: 'alan@turing.com',
@@ -53,9 +55,9 @@ describe('UsersController – update', () => {
 
   it('PUT /users/:id → lança NotFoundException se usuário não existe', async () => {
     service.update.mockResolvedValue(undefined);
-    await expect(controller.update('999', {} as Record<string, any>)).rejects.toThrow(
-      'Usuário não encontrado.',
-    );
+    await expect(
+      controller.update('999', {} as Record<string, any>),
+    ).rejects.toThrow('Usuário não encontrado.');
     expect(service.update).toHaveBeenCalledWith(999, {});
   });
 });

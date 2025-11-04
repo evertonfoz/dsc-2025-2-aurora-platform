@@ -22,7 +22,9 @@ describe('EventsController – update', () => {
 
   it('PATCH /events/:id → delega ao service.update e retorna evento atualizado', async () => {
     const updateDto = { title: 'Updated Title' };
-    const updated: Partial<import('../../../src/events/entities/event.entity').Event> = makeEventEntity({
+    const updated: Partial<
+      import('../../../src/events/entities/event.entity').Event
+    > = makeEventEntity({
       id: 7,
       title: 'Updated Title',
     });
@@ -43,9 +45,17 @@ describe('EventsController – update', () => {
 
   it('PATCH /events/:id → retorna undefined quando service retorna undefined (não lança)', async () => {
     service.update.mockResolvedValue(undefined);
-  const res = await controller.update('999' as unknown as number, {} as Record<string, any>, 1);
+    const res = await controller.update(
+      '999' as unknown as number,
+      {} as Record<string, any>,
+      1,
+    );
     // Note: when calling controller methods directly in unit tests, pipes (ParseIntPipe) are not applied.
-    expect(service.update).toHaveBeenCalledWith('999', {}, { id: 1, isAdmin: false });
+    expect(service.update).toHaveBeenCalledWith(
+      '999',
+      {},
+      { id: 1, isAdmin: false },
+    );
     expect(res).toBeUndefined();
   });
 });

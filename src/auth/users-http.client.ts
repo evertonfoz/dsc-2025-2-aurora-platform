@@ -27,7 +27,8 @@ export class UsersHttpClient {
       );
       // Accept both plain UsersIdentity or wrapped { data: UsersIdentity }
       const data = res.data as UsersIdentity | { data: UsersIdentity };
-      const payload: UsersIdentity | undefined = 'data' in data ? data.data : data;
+      const payload: UsersIdentity | undefined =
+        'data' in data ? data.data : data;
       return payload?.id ? payload : null;
     } catch {
       return null;
@@ -40,7 +41,8 @@ export class UsersHttpClient {
         `${this.baseUrl}/users/${userId}`,
       );
       const data = res.data as UsersIdentity | { data: UsersIdentity };
-      const payload: UsersIdentity | undefined = 'data' in data ? data.data : data;
+      const payload: UsersIdentity | undefined =
+        'data' in data ? data.data : data;
       return payload?.id ? payload : null;
     } catch {
       return null;

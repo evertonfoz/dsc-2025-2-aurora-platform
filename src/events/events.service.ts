@@ -28,7 +28,9 @@ export class EventsService {
     ownerUserId: number,
   ): Promise<Event> {
     try {
-      this.logger.log(`create called owner=${ownerUserId} title=${createEventDto.title}`);
+      this.logger.log(
+        `create called owner=${ownerUserId} title=${createEventDto.title}`,
+      );
     } catch {
       /* ignore */
     }
@@ -173,7 +175,9 @@ export class EventsService {
     requester: { id: number; isAdmin: boolean },
   ): Promise<Event> {
     try {
-      this.logger.log(`update called id=${id} by requester=${JSON.stringify(requester)}`);
+      this.logger.log(
+        `update called id=${id} by requester=${JSON.stringify(requester)}`,
+      );
     } catch {
       /* ignore */
     }
@@ -228,7 +232,9 @@ export class EventsService {
     requester: { id: number; isAdmin: boolean },
   ): Promise<Event> {
     try {
-      this.logger.log(`publish called id=${id} by requester=${JSON.stringify(requester)}`);
+      this.logger.log(
+        `publish called id=${id} by requester=${JSON.stringify(requester)}`,
+      );
     } catch {
       /* ignore */
     }

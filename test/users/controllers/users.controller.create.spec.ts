@@ -26,9 +26,11 @@ describe('UsersController – create', () => {
 
   it('POST /users → delega ao service.create', async () => {
     const body = makeCreateUserDto({ role: UserRole.TEACHER });
-    const saved: Partial<import('../../../src/users/entities/user.entity').User> = makeUserEntity({ id: 1, ...body });
+    const saved: Partial<
+      import('../../../src/users/entities/user.entity').User
+    > = makeUserEntity({ id: 1, ...body });
     service.create.mockResolvedValue(saved);
-  const res = await controller.create(body);
+    const res = await controller.create(body);
     expect(service.create).toHaveBeenCalledWith(body);
     expectDtoMappedToEntity(
       {

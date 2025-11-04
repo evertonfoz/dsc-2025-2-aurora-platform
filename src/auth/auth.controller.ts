@@ -20,7 +20,10 @@ import { JwtService } from '@nestjs/jwt';
 @Controller('auth')
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
 export class AuthController {
-  constructor(private readonly auth: AuthService, private readonly jwt: JwtService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly jwt: JwtService,
+  ) {}
 
   @Post('login')
   async login(@Body() dto: LoginDto, @Ip() ip: string, @Req() req: Request) {
@@ -31,7 +34,11 @@ export class AuthController {
   }
 
   @Post('refresh')
-  async refresh(@Body() dto: RefreshDto, @Ip() ip: string, @Req() req: Request) {
+  async refresh(
+    @Body() dto: RefreshDto,
+    @Ip() ip: string,
+    @Req() req: Request,
+  ) {
     const ua = req.get('user-agent') ?? undefined;
     // Se desejar, você pode aceitar refresh também via cookie httpOnly aqui.
     return this.auth.refresh(dto.refreshToken, ip, ua);
@@ -44,7 +51,7 @@ export class AuthController {
 
   @Get('me')
   async me(@Headers('authorization') authz?: string) {
-    if (!authz || !authz.startsWith('Bearer ')) {
+    if (!authz?.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing bearer token');
     }
     const token = authz.slice('Bearer '.length);
@@ -60,7 +67,11 @@ export class AuthController {
     }
 
     // payload should be an object with `sub` (number|string)
-    if (typeof payload !== 'object' || payload === null || !('sub' in payload)) {
+    if (
+      typeof payload !== 'object' ||
+      payload === null ||
+      !('sub' in payload)
+    ) {
       throw new UnauthorizedException('Invalid token payload');
     }
 
@@ -77,4 +88,3 @@ export class AuthController {
     return this.auth.me(userId);
   }
 }
- 

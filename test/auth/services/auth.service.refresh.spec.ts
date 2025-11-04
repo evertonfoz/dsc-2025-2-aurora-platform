@@ -56,7 +56,9 @@ describe('AuthService.refresh (unit)', () => {
     // repo.find should return the candidate
     repo.find.mockResolvedValue([token]);
     // when creating/saving new token
-    repo.create.mockImplementation((e: Partial<RefreshToken>) => Object.assign({}, e) as RefreshToken);
+    repo.create.mockImplementation(
+      (e: Partial<RefreshToken>) => Object.assign({}, e) as RefreshToken,
+    );
     repo.save.mockImplementation((e: Partial<RefreshToken>) =>
       Promise.resolve(Object.assign({ id: 2 }, e) as RefreshToken),
     );

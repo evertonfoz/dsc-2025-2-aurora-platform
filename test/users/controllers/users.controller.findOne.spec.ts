@@ -22,7 +22,9 @@ describe('UsersController – findOne', () => {
   });
 
   it('GET /users/:id → delega ao service.findOne e retorna o usuário mapeado para DTO', async () => {
-    const user: Partial<import('../../../src/users/entities/user.entity').User> = makeUserEntity({
+    const user: Partial<
+      import('../../../src/users/entities/user.entity').User
+    > = makeUserEntity({
       id: 42,
       name: 'Grace Hopper',
       email: 'grace@navy.mil',

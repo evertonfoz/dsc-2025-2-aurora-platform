@@ -4,11 +4,11 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
-export type AuthUser = {
-  sub: number;         // id do usuário (int do BD)
+export interface AuthUser {
+  sub: number; // id do usuário (int do BD)
   email: string;
-  roles: string[];     // ex.: ['student'] | ['teacher'] | ['admin']
-};
+  roles: string[]; // ex.: ['student'] | ['teacher'] | ['admin']
+}
 
 export type AccessTokenPayload = AuthUser & {
   iat: number;
@@ -18,12 +18,20 @@ export type AccessTokenPayload = AuthUser & {
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(@Optional() private readonly config?: ConfigService) {
+    // Resolve secret explicitly so we can throw in production when missing.
+    const resolvedSecret =
+      config?.get<string>('JWT_ACCESS_SECRET') ?? process.env.JWT_ACCESS_SECRET;
+
+    if (!resolvedSecret) {
+      if (process.env.NODE_ENV === 'production') {
+        // In production we want to fail fast if the secret is not configured.
+        throw new Error('JwtStrategy requires JWT_ACCESS_SECRET when running in production');
+      }
+    }
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      secretOrKey:
-        (config && config.get<string>('JWT_ACCESS_SECRET')) ??
-        process.env.JWT_ACCESS_SECRET ??
-        '',
+      secretOrKey: resolvedSecret ?? 'dev_access_secret',
       ignoreExpiration: false,
       // Se você usa issuer/audience, descomente e configure no .env:
       // issuer: config.get<string>('JWT_ISSUER'),
