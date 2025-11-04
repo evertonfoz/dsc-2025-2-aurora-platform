@@ -37,8 +37,12 @@ describe('EventsService  create', () => {
     const saved = makeEventEntity({
       id: 1,
       slug: 'my-event',
-      ...dto,
-    } as any) as any;
+      title: dto.title,
+      summary: dto.summary,
+      description: dto.description,
+      startsAt: new Date(dto.startsAt),
+      endsAt: new Date(dto.endsAt),
+    });
 
     repository.findOne.mockResolvedValue(undefined); // ensureUniqueSlug
     repository.create.mockReturnValue(saved);
@@ -52,13 +56,16 @@ describe('EventsService  create', () => {
   });
 
   it('throws when endsAt is before startsAt', async () => {
-    const dto: any = {
+    const startsAt = new Date(Date.now() + 1000 * 60 * 60).toISOString();
+    const endsAt = new Date(Date.now() + 1000 * 60).toISOString();
+    const dto = makeCreateEventDto({
       title: 'My Event',
       summary: 'Summ',
       description: 'Desc',
-      startsAt: new Date(Date.now() + 1000 * 60 * 60).toISOString(),
-      endsAt: new Date(Date.now() + 1000 * 60).toISOString(),
-    };
+      startsAt,
+      endsAt,
+    });
+
     await expect(service.create(dto, 1)).rejects.toThrow();
   });
 });

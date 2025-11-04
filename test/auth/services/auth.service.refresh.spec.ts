@@ -56,11 +56,9 @@ describe('AuthService.refresh (unit)', () => {
     // repo.find should return the candidate
     repo.find.mockResolvedValue([token]);
     // when creating/saving new token
-    repo.create.mockImplementation((e: Partial<RefreshToken>) => ({
-      ...(e as any),
-    }));
-    repo.save.mockImplementation((e: Partial<any>) =>
-      Promise.resolve({ id: 2, ...(e as any) }),
+    repo.create.mockImplementation((e: Partial<RefreshToken>) => Object.assign({}, e) as RefreshToken);
+    repo.save.mockImplementation((e: Partial<RefreshToken>) =>
+      Promise.resolve(Object.assign({ id: 2 }, e) as RefreshToken),
     );
 
     const res = await service.refresh(raw, '1.2.3.4', 'jest');

@@ -45,8 +45,8 @@ describe('AuthService.logout (unit)', () => {
     const token = makeRefreshTokenEntity({ userId: 1 }) as RefreshToken;
     token.tokenHash = await argon2.hash(raw);
     repo.find.mockResolvedValue([token]);
-    repo.save.mockImplementation((e: Partial<any>) =>
-      Promise.resolve({ id: token.id, ...(e as any) }),
+    repo.save.mockImplementation((e: Partial<RefreshToken>) =>
+      Promise.resolve(Object.assign({ id: token.id }, e) as RefreshToken),
     );
 
     const r = await service.logout(raw);

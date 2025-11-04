@@ -30,7 +30,7 @@ describe('AuthController – me', () => {
   });
 
   it('GET /auth/me → lança quando sem Bearer', async () => {
-    await expect(controller.me(undefined as any)).rejects.toThrow();
+  await expect(controller.me(undefined)).rejects.toThrow();
   });
 
   it('GET /auth/me → lança quando token inválido', async () => {

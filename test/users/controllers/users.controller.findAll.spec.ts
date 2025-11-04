@@ -1,6 +1,7 @@
 // test/users/controllers/users.controller.findAll.spec.ts
 import { Test } from '@nestjs/testing';
 import { UsersController } from '../../../src/users/users.controller';
+import { PaginationQueryDto } from '../../../src/users/dto/pagination-query.dto';
 import { UsersService } from '../../../src/users/users.service';
 import { UserRole } from '../../../src/users/enums/user-role.enum';
 import { makeUserEntity } from '../../factories/user.factory';
@@ -26,22 +27,22 @@ describe('UsersController – findAll', () => {
       role: UserRole.ADMIN,
       is_active: true,
     };
-    const user = makeUserEntity() as any;
+    const user: Partial<import('../../../src/users/entities/user.entity').User> = makeUserEntity();
     service.findAll.mockResolvedValue({
       data: [user],
       total: 1,
       page: 2,
       limit: 5,
     });
-    const res = await controller.findAll(query as any);
-    expect(service.findAll).toHaveBeenCalledWith(query);
+  const res = await controller.findAll(query as unknown as PaginationQueryDto);
+  expect(service.findAll).toHaveBeenCalledWith(query);
     // Compare essential pagination fields and that returned data contains expected user
     expect(res).toEqual(
       expect.objectContaining({ total: 1, page: 2, limit: 5 }),
     );
     expectDtoMappedToEntity(
-      { id: user.id, email: user.email } as any,
-      res.data[0] as any,
+      { id: user.id, email: user.email } as Record<string, any>,
+      res.data[0] as Record<string, any>,
       ['id', 'email'],
     );
   });

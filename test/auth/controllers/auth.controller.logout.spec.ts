@@ -22,9 +22,9 @@ describe('AuthController – logout', () => {
 
   it('POST /auth/logout → delega ao service.logout', async () => {
     service.logout.mockResolvedValue({ revoked: 1 });
-    const body = { refreshToken: 'tok' } as any;
-    const res = await controller.logout(body);
-    expect(service.logout).toHaveBeenCalledWith(body.refreshToken);
+  const body = { refreshToken: 'tok' } as import('../../../src/auth/dtos/logout.dto').LogoutDto;
+  const res = await controller.logout(body);
+  expect(service.logout).toHaveBeenCalledWith(body.refreshToken);
     expect(res).toEqual({ revoked: 1 });
   });
 });

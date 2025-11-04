@@ -26,7 +26,7 @@ describe('EventsService \u2013 publish', () => {
   });
 
   it('publishes when owner and in draft', async () => {
-    const existing: any = { id: 8, ownerUserId: 20, state: EventState.DRAFT };
+  const existing: Partial<import('../../../src/events/entities/event.entity').Event> = { id: 8, ownerUserId: 20, state: EventState.DRAFT };
     repository.findOneBy.mockResolvedValue(existing);
     repository.save.mockResolvedValue({
       ...existing,
@@ -38,7 +38,7 @@ describe('EventsService \u2013 publish', () => {
   });
 
   it('throws when invalid transition', async () => {
-    const existing: any = {
+    const existing: Partial<import('../../../src/events/entities/event.entity').Event> = {
       id: 9,
       ownerUserId: 2,
       state: EventState.PUBLISHED,

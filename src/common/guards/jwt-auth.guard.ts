@@ -1,4 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 
 /**
  * Placeholder JWT guard.
@@ -9,16 +10,17 @@ import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
  */
 
 @Injectable()
-export class JwtAuthGuard implements CanActivate {
-  /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-  canActivate(context: ExecutionContext): boolean {
-    // In DEV, inject fake user
+export class JwtAuthGuard extends AuthGuard('jwt') implements CanActivate {
+  // Preserve the previous dev behavior: when NODE_ENV !== 'production', inject a fake
+  // user so existing unit tests and development flows continue to work.
+  // In production, delegate to Passport's AuthGuard('jwt').
+  canActivate(context: ExecutionContext): any {
     if (process.env.NODE_ENV !== 'production') {
       const request = context.switchToHttp().getRequest();
-      request.user = { sub: 1, isAdmin: true };
+      // keep minimal shape used across the codebase
+      request.user = { sub: 1, isAdmin: true, roles: ['admin'] };
+      return true;
     }
-    // Implement JWT validation here or use `@nestjs/passport` AuthGuard('jwt')
-    // Returning true for now as a placeholder.
-    return true;
+    return super.canActivate(context);
   }
 }

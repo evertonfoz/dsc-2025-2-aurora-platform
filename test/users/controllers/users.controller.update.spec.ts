@@ -10,7 +10,7 @@ import {
 } from '../../utils/asserts';
 describe('UsersController – update', () => {
   let controller: UsersController;
-  const service = { update: jest.fn() };
+  const service = { update: jest.fn() } as { update: jest.Mock };
 
   beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -28,14 +28,14 @@ describe('UsersController – update', () => {
       password: 'novaSenha',
       role: UserRole.TEACHER,
     };
-    const updatedUser = makeUserEntity({
+    const updatedUser: Partial<import('../../../src/users/entities/user.entity').User> = makeUserEntity({
       id: 7,
       name: 'Alan Turing',
       email: 'alan@turing.com',
       role: UserRole.TEACHER,
-    } as any) as any;
+    });
     service.update.mockResolvedValue(updatedUser);
-    const res = await controller.update('7', updateDto as any);
+    const res = await controller.update('7', updateDto as Record<string, any>);
     expect(service.update).toHaveBeenCalledWith(7, updateDto);
     expectDtoMappedToEntity(
       {
@@ -44,16 +44,16 @@ describe('UsersController – update', () => {
         email: 'alan@turing.com',
         role: UserRole.TEACHER,
         isActive: true,
-      } as any,
-      res as any,
+      } as Record<string, any>,
+      res as Record<string, any>,
       ['id', 'name', 'email', 'role', 'isActive'],
     );
-    expectNoSensitiveFields(res as any);
+    expectNoSensitiveFields(res as Record<string, any>);
   });
 
   it('PUT /users/:id → lança NotFoundException se usuário não existe', async () => {
     service.update.mockResolvedValue(undefined);
-    await expect(controller.update('999', {} as any)).rejects.toThrow(
+    await expect(controller.update('999', {} as Record<string, any>)).rejects.toThrow(
       'Usuário não encontrado.',
     );
     expect(service.update).toHaveBeenCalledWith(999, {});

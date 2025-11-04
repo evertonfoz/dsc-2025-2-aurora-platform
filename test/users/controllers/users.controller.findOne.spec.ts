@@ -22,12 +22,12 @@ describe('UsersController – findOne', () => {
   });
 
   it('GET /users/:id → delega ao service.findOne e retorna o usuário mapeado para DTO', async () => {
-    const user = makeUserEntity({
+    const user: Partial<import('../../../src/users/entities/user.entity').User> = makeUserEntity({
       id: 42,
       name: 'Grace Hopper',
       email: 'grace@navy.mil',
       role: UserRole.ADMIN,
-    } as any) as any;
+    });
     service.findOne.mockResolvedValue(user);
     const res = await controller.findOne('42');
     expect(service.findOne).toHaveBeenCalledWith(42);
@@ -38,11 +38,11 @@ describe('UsersController – findOne', () => {
         email: 'grace@navy.mil',
         role: UserRole.ADMIN,
         isActive: true,
-      } as any,
-      res as any,
+      } as Record<string, any>,
+      res as Record<string, any>,
       ['id', 'name', 'email', 'role', 'isActive'],
     );
-    expectNoSensitiveFields(res as any);
+    expectNoSensitiveFields(res as Record<string, any>);
   });
 
   it('GET /users/:id → lança NotFoundException se usuário não existe', async () => {
