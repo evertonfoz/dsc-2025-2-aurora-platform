@@ -37,7 +37,7 @@ describe('UsersController – update', () => {
       role: UserRole.TEACHER,
     });
     service.update.mockResolvedValue(updatedUser);
-    const res = await controller.update('7', updateDto as Record<string, any>);
+    const res = await controller.update('7', updateDto as unknown as Record<string, unknown>, undefined as unknown as number, undefined);
     expect(service.update).toHaveBeenCalledWith(7, updateDto);
     expectDtoMappedToEntity(
       {
@@ -46,18 +46,16 @@ describe('UsersController – update', () => {
         email: 'alan@turing.com',
         role: UserRole.TEACHER,
         isActive: true,
-      } as Record<string, any>,
-      res as Record<string, any>,
+      } as unknown as Record<string, unknown>,
+      res as unknown as Record<string, unknown>,
       ['id', 'name', 'email', 'role', 'isActive'],
     );
-    expectNoSensitiveFields(res as Record<string, any>);
+    expectNoSensitiveFields(res as unknown as Record<string, unknown>);
   });
 
   it('PUT /users/:id → lança NotFoundException se usuário não existe', async () => {
     service.update.mockResolvedValue(undefined);
-    await expect(
-      controller.update('999', {} as Record<string, any>),
-    ).rejects.toThrow('Usuário não encontrado.');
+    await expect(controller.update('999', {} as unknown as Record<string, unknown>, undefined as unknown as number, undefined)).rejects.toThrow('Usuário não encontrado.');
     expect(service.update).toHaveBeenCalledWith(999, {});
   });
 });

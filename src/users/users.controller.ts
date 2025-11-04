@@ -66,7 +66,7 @@ export class UsersController {
   @ApiBadRequestResponse({ description: 'Payload ou ID inválido.' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
   @Patch(':id')
-  @UseGuards(RolesGuard, JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   async patch(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
@@ -98,7 +98,7 @@ export class UsersController {
   @ApiBadRequestResponse({ description: 'Payload ou ID inválido.' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
   @Put(':id')
-  @UseGuards(RolesGuard, JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
@@ -157,7 +157,7 @@ export class UsersController {
     description: 'Sem permissão (se houver autorização).',
   })
   @Post()
-  @UseGuards(RolesGuard, JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   async create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
     const user = await this.users.create(dto);
@@ -226,7 +226,7 @@ export class UsersController {
   @ApiUnauthorizedResponse({ description: 'Não autenticado (se aplicável).' })
   @ApiForbiddenResponse({ description: 'Sem permissão (se aplicável).' })
   @Get()
-  @UseGuards(RolesGuard, JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('teacher', 'admin')
   async findAll(
     @Query() query: PaginationQueryDto,
@@ -254,7 +254,7 @@ export class UsersController {
   @ApiBadRequestResponse({ description: 'ID inválido.' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
   @Get(':id')
-  @UseGuards(RolesGuard, JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   async findOne(
     @Param('id') id: string,
     @OwnerId() requesterId: number,
@@ -288,7 +288,7 @@ export class UsersController {
   @ApiBadRequestResponse({ description: 'ID inválido.' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
   @Delete(':id')
-  @UseGuards(RolesGuard, JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   async remove(@Param('id') id: string, @OwnerId() requesterId: number, @Req() req?: Request): Promise<{ success: boolean }> {
     const isAdmin = Array.isArray((req?.user as any)?.roles)

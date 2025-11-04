@@ -56,7 +56,7 @@ describe('EventsController – findOne', () => {
       ev as unknown as import('../../../src/events/entities/event.entity').Event,
     );
 
-    const res = await controller.findOne('5');
+  const res = await controller.findOne('5', undefined as unknown as number, undefined);
 
     expect(service.findOneByIdOrSlug).toHaveBeenCalledWith(5);
     expect(res).toEqual(ev);
@@ -68,7 +68,7 @@ describe('EventsController – findOne', () => {
       ev as unknown as import('../../../src/events/entities/event.entity').Event,
     );
 
-    const res = await controller.findOne('my-slug');
+  const res = await controller.findOne('my-slug', undefined as unknown as number, undefined);
 
     expect(service.findOneByIdOrSlug).toHaveBeenCalledWith('my-slug');
     expect(res).toEqual(ev);

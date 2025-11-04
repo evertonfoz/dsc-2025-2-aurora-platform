@@ -39,10 +39,10 @@ describe('UsersController – create', () => {
         email: body.email,
         role: body.role,
         isActive: true,
-      } as Record<string, any>,
-      res as Record<string, any>,
+      } as unknown as Record<string, unknown>,
+      res as unknown as Record<string, unknown>,
       ['id', 'name', 'email', 'role', 'isActive'],
     );
-    expectNoSensitiveFields(res as Record<string, any>);
+    expectNoSensitiveFields(res as unknown as Record<string, unknown>);
   });
 });

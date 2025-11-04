@@ -45,8 +45,8 @@ describe('UsersController – findAll', () => {
       expect.objectContaining({ total: 1, page: 2, limit: 5 }),
     );
     expectDtoMappedToEntity(
-      { id: user.id, email: user.email } as Record<string, any>,
-      res.data[0] as Record<string, any>,
+      { id: user.id, email: user.email } as unknown as Record<string, unknown>,
+      res.data[0] as unknown as Record<string, unknown>,
       ['id', 'email'],
     );
   });

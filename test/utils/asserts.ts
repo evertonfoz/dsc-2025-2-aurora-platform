@@ -1,6 +1,6 @@
 export function expectDtoMappedToEntity(
-  dto: Record<string, any>,
-  entity: Record<string, any>,
+  dto: Record<string, unknown>,
+  entity: Record<string, unknown>,
   keys?: string[],
 ) {
   const checkKeys = keys ?? Object.keys(dto);
@@ -8,14 +8,14 @@ export function expectDtoMappedToEntity(
     // use loose equality to avoid Date vs string mismatches in some cases
     expect(entity).toHaveProperty(k);
     // If dto has undefined, skip deep equality check
-    if (dto[k] !== undefined) {
-      expect(entity[k]).toEqual(dto[k]);
+    if ((dto as any)[k] !== undefined) {
+      expect((entity as any)[k]).toEqual((dto as any)[k]);
     }
   });
 }
 
 export function expectNoSensitiveFields(
-  obj: Record<string, any>,
+  obj: Record<string, unknown>,
   fields: string[] = ['passwordHash'],
 ) {
   fields.forEach((f) => expect(obj).not.toHaveProperty(f));

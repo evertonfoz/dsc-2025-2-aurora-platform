@@ -56,7 +56,7 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(RolesGuard, JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   async me(@Headers('authorization') authz?: string) {
     if (!authz?.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing bearer token');

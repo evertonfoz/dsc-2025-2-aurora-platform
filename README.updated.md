@@ -1,9 +1,8 @@
+````markdown
 # Notas de segurança e exemplos HTTP
 
 - Segurança: em ambientes de produção o serviço exige que a variável de ambiente `JWT_ACCESS_SECRET` esteja configurada. A aplicação falha ao iniciar se essa variável não existir quando `NODE_ENV=production`.
 - Não habilite fallbacks para segredos em produção — use variáveis de ambiente seguras (secrets manager) e fail-fast para evitar vazamentos.
-
-- Nota de desenvolvimento: existe uma variável `DEV_AUTO_AUTH` (opcional) que, quando definida como `true` em ambientes de desenvolvimento, permite que a aplicação auto-injete um usuário falso para facilitar testes rápidos sem um JWT válido. Por padrão essa flag está desativada. NUNCA habilite `DEV_AUTO_AUTH=true` em ambientes de produção.
 
 - Exemplos HTTP: os exemplos ficam na pasta `https/` organizados por domínio (`https/auth`, `https/users`, `https/events`). Não é necessário mover ou editar os arquivos `.http` para executar os exemplos — abra-os no seu REST client (por exemplo, VS Code REST Client) e defina as variáveis (`{{apiBase}}`, `{{adminToken}}`, `{{teacherToken}}`, `{{studentToken}}`) no topo do arquivo ou em um arquivo de variáveis incluído.
 
@@ -99,3 +98,7 @@ curl http://localhost:3000/health
 - Screenshot das regras de Branch Protection
 - Link de PR com “All checks have passed” (lint/build/test)
 - Execução do workflow CI (link dos jobs)
+
+- [Deploy — Produção](docs/DEPLOYMENT.md) (instruções detalhadas)
+
+````

@@ -29,7 +29,7 @@ export class EventsController {
   private readonly logger = new Logger(EventsController.name);
 
   @Post()
-  @UseGuards(RolesGuard, JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('teacher', 'admin')
   create(
     @Body() createEventDto: CreateEventDto,
@@ -46,7 +46,7 @@ export class EventsController {
   }
 
   @Get()
-  @UseGuards(RolesGuard, JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   findAll(
     @Query('q') q?: string,
     @Query('from') from?: string,
@@ -74,7 +74,7 @@ export class EventsController {
   }
 
   @Get(':idOrSlug')
-  @UseGuards(RolesGuard, JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   findOne(@Param('idOrSlug') idOrSlug: string, @OwnerId() ownerUserId?: number, @Req() req?: Request) {
     try {
       this.logger.log(`findOne called with idOrSlug=${idOrSlug}`);
@@ -89,7 +89,7 @@ export class EventsController {
   }
 
   @Patch(':id')
-  @UseGuards(RolesGuard, JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateEventDto: UpdateEventDto,
@@ -111,7 +111,7 @@ export class EventsController {
   }
 
   @Post(':id/publish')
-  @UseGuards(RolesGuard, JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   publish(
     @Param('id', ParseIntPipe) id: number,
     @OwnerId() ownerUserId: number,
