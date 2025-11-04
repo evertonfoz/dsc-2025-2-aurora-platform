@@ -29,7 +29,7 @@ export class UsersHttpClient {
       const data = res.data as UsersIdentity | { data: UsersIdentity };
       const payload: UsersIdentity | undefined = 'data' in data ? data.data : data;
       return payload?.id ? payload : null;
-    } catch (_err) {
+    } catch {
       return null;
     }
   }
@@ -42,7 +42,7 @@ export class UsersHttpClient {
       const data = res.data as UsersIdentity | { data: UsersIdentity };
       const payload: UsersIdentity | undefined = 'data' in data ? data.data : data;
       return payload?.id ? payload : null;
-    } catch (_err) {
+    } catch {
       return null;
     }
   }

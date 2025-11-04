@@ -29,7 +29,9 @@ export class EventsService {
   ): Promise<Event> {
     try {
       this.logger.log(`create called owner=${ownerUserId} title=${createEventDto.title}`);
-    } catch (_e) {}
+    } catch {
+      /* ignore */
+    }
     // Validate dates
     const startsAt = new Date(createEventDto.startsAt);
     const endsAt = new Date(createEventDto.endsAt);
@@ -84,7 +86,9 @@ export class EventsService {
   }) {
     try {
       this.logger.log(`findAll querying with ${JSON.stringify(query)}`);
-    } catch (_e) {}
+    } catch {
+      /* ignore */
+    }
     const qb = this.eventRepository.createQueryBuilder('event');
 
     // Filters
@@ -130,7 +134,9 @@ export class EventsService {
   ): Promise<Event> {
     try {
       this.logger.log(`findOneByIdOrSlug called with ${String(idOrSlug)}`);
-    } catch (_e) {}
+    } catch {
+      /* ignore */
+    }
     const qb = this.eventRepository.createQueryBuilder('event');
     if (typeof idOrSlug === 'number') {
       qb.where('event.id = :id', { id: idOrSlug });
@@ -142,7 +148,9 @@ export class EventsService {
     if (!event) {
       try {
         this.logger.log(`event not found for ${String(idOrSlug)}`);
-      } catch (_e) {}
+      } catch {
+        /* ignore */
+      }
       throw new NotFoundException('Event not found');
     }
 
@@ -166,7 +174,9 @@ export class EventsService {
   ): Promise<Event> {
     try {
       this.logger.log(`update called id=${id} by requester=${JSON.stringify(requester)}`);
-    } catch (_e) {}
+    } catch {
+      /* ignore */
+    }
     const event = await this.eventRepository.findOneBy({ id });
     if (!event) {
       throw new NotFoundException('Event not found');
@@ -219,7 +229,9 @@ export class EventsService {
   ): Promise<Event> {
     try {
       this.logger.log(`publish called id=${id} by requester=${JSON.stringify(requester)}`);
-    } catch (_e) {}
+    } catch {
+      /* ignore */
+    }
     const event = await this.eventRepository.findOneBy({ id });
     if (!event) {
       throw new NotFoundException('Event not found');

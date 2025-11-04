@@ -30,7 +30,7 @@ export class EventsController {
   ) {
     try {
       this.logger.log(`create called by owner=${ownerUserId} title=${createEventDto.title}`);
-    } catch (_e) {
+    } catch {
       /* ignore logging errors */
     }
     return this.eventsService.create(createEventDto, ownerUserId);
@@ -57,7 +57,7 @@ export class EventsController {
     };
     try {
       this.logger.log(`findAll called with ${JSON.stringify(payload)}`);
-    } catch (_e) {
+    } catch {
       /* ignore */
     }
     return this.eventsService.findAll(payload);
@@ -67,7 +67,9 @@ export class EventsController {
   findOne(@Param('idOrSlug') idOrSlug: string) {
     try {
       this.logger.log(`findOne called with idOrSlug=${idOrSlug}`);
-    } catch (_e) {}
+    } catch {
+      /* ignore */
+    }
     const id = parseInt(idOrSlug, 10);
     if (!isNaN(id)) {
       return this.eventsService.findOneByIdOrSlug(id);
@@ -84,7 +86,9 @@ export class EventsController {
   ) {
     try {
       this.logger.log(`update called id=${id} by owner=${ownerUserId}`);
-    } catch (_e) {}
+    } catch {
+      /* ignore */
+    }
     return this.eventsService.update(id, updateEventDto, {
       id: ownerUserId,
       isAdmin: false,
@@ -99,7 +103,9 @@ export class EventsController {
   ) {
     try {
       this.logger.log(`publish called id=${id} by owner=${ownerUserId}`);
-    } catch (_e) {}
+    } catch {
+      /* ignore */
+    }
     return this.eventsService.publish(id, { id: ownerUserId, isAdmin: false });
   }
 }
