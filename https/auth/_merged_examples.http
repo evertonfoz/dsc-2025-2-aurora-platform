@@ -1,0 +1,28 @@
+### Merged examples from /https/auth.http on 2025-11-04
+
+### Login as admin
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "StrongP@ssw0rd!"
+}
+
+### Login as teacher
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "email": "teacher@example.com",
+  "password": "StrongP@ssw0rd!"
+}
+
+### Login as student
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "email": "student@example.com",
+  "password": "StrongP@ssw0rd!"
+}

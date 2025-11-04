@@ -1,0 +1,31 @@
+### Merged examples from /https/events.http on 2025-11-04
+
+### Create event (teacher/admin)
+POST http://localhost:3000/events
+Content-Type: application/json
+Authorization: Bearer {{teacher_token}}
+
+{
+  "title": "Workshop",
+  "summary": "A short workshop",
+  "startsAt": "2026-01-01T10:00:00.000Z",
+  "endsAt": "2026-01-01T12:00:00.000Z"
+}
+
+### Update event (owner or admin)
+PATCH http://localhost:3000/events/{{event_id}}
+Content-Type: application/json
+Authorization: Bearer {{teacher_token}}
+
+{
+  "title": "Updated title"
+}
+
+### Create registration (student)
+POST http://localhost:3000/events/{{event_id}}/registrations
+Content-Type: application/json
+Authorization: Bearer {{student_token}}
+
+{
+  "note": "Looking forward"
+}
