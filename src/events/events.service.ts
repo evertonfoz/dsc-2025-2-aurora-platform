@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -20,10 +21,15 @@ export class EventsService {
     private readonly eventRepository: Repository<Event>,
   ) {}
 
+  private readonly logger = new Logger(EventsService.name);
+
   async create(
     createEventDto: CreateEventDto,
     ownerUserId: number,
   ): Promise<Event> {
+    try {
+      this.logger.log(`create called owner=${ownerUserId} title=${createEventDto.title}`);
+    } catch (e) {}
     // Validate dates
     const startsAt = new Date(createEventDto.startsAt);
     const endsAt = new Date(createEventDto.endsAt);
@@ -76,6 +82,9 @@ export class EventsService {
     page: number;
     limit: number;
   }) {
+    try {
+      this.logger.log(`findAll querying with ${JSON.stringify(query)}`);
+    } catch (e) {}
     const qb = this.eventRepository.createQueryBuilder('event');
 
     // Filters
@@ -119,6 +128,9 @@ export class EventsService {
     idOrSlug: number | string,
     requester?: { id: number; isAdmin: boolean },
   ): Promise<Event> {
+    try {
+      this.logger.log(`findOneByIdOrSlug called with ${String(idOrSlug)}`);
+    } catch (e) {}
     const qb = this.eventRepository.createQueryBuilder('event');
     if (typeof idOrSlug === 'number') {
       qb.where('event.id = :id', { id: idOrSlug });
@@ -128,6 +140,9 @@ export class EventsService {
 
     const event = await qb.getOne();
     if (!event) {
+      try {
+        this.logger.log(`event not found for ${String(idOrSlug)}`);
+      } catch (e) {}
       throw new NotFoundException('Event not found');
     }
 
@@ -149,6 +164,9 @@ export class EventsService {
     updateEventDto: UpdateEventDto,
     requester: { id: number; isAdmin: boolean },
   ): Promise<Event> {
+    try {
+      this.logger.log(`update called id=${id} by requester=${JSON.stringify(requester)}`);
+    } catch (e) {}
     const event = await this.eventRepository.findOneBy({ id });
     if (!event) {
       throw new NotFoundException('Event not found');
@@ -199,6 +217,9 @@ export class EventsService {
     id: number,
     requester: { id: number; isAdmin: boolean },
   ): Promise<Event> {
+    try {
+      this.logger.log(`publish called id=${id} by requester=${JSON.stringify(requester)}`);
+    } catch (e) {}
     const event = await this.eventRepository.findOneBy({ id });
     if (!event) {
       throw new NotFoundException('Event not found');

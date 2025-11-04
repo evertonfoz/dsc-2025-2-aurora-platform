@@ -28,16 +28,17 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASS: postgres
-      DB_NAME: aurora_users
-      DB_LOGGING: false
+ 
       PORT: 3001
-      NODE_ENV: production
+      NODE_ENV: development
       USERS_API_URL: http://localhost:3001/v1
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    command: npm run start:dev
     networks:
       - aurora_network
 

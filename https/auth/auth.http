@@ -8,8 +8,8 @@ POST {{apiBase}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "ok@example.com",
-  "password": "secret"
+  "email": "test.user@example.com",
+  "password": "StrongP@ssw0rd"
 }
 
 ### POST /auth/refresh

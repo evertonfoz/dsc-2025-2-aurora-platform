@@ -8,6 +8,7 @@ import {
   Body,
   ParseIntPipe,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import { EventsService } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
@@ -19,12 +20,19 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
+  private readonly logger = new Logger(EventsController.name);
+
   @Post()
   @UseGuards(JwtAuthGuard)
   create(
     @Body() createEventDto: CreateEventDto,
     @OwnerId() ownerUserId: number,
   ) {
+    try {
+      this.logger.log(`create called by owner=${ownerUserId} title=${createEventDto.title}`);
+    } catch (e) {
+      /* ignore logging errors */
+    }
     return this.eventsService.create(createEventDto, ownerUserId);
   }
 
@@ -38,7 +46,7 @@ export class EventsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.eventsService.findAll({
+    const payload = {
       q,
       from,
       to,
@@ -46,11 +54,20 @@ export class EventsController {
       state,
       page: page ? parseInt(page, 10) : 1,
       limit: limit ? parseInt(limit, 10) : 20,
-    });
+    };
+    try {
+      this.logger.log(`findAll called with ${JSON.stringify(payload)}`);
+    } catch (e) {
+      /* ignore */
+    }
+    return this.eventsService.findAll(payload);
   }
 
   @Get(':idOrSlug')
   findOne(@Param('idOrSlug') idOrSlug: string) {
+    try {
+      this.logger.log(`findOne called with idOrSlug=${idOrSlug}`);
+    } catch (e) {}
     const id = parseInt(idOrSlug, 10);
     if (!isNaN(id)) {
       return this.eventsService.findOneByIdOrSlug(id);
@@ -65,6 +82,9 @@ export class EventsController {
     @Body() updateEventDto: UpdateEventDto,
     @OwnerId() ownerUserId: number,
   ) {
+    try {
+      this.logger.log(`update called id=${id} by owner=${ownerUserId}`);
+    } catch (e) {}
     return this.eventsService.update(id, updateEventDto, {
       id: ownerUserId,
       isAdmin: false,
@@ -77,6 +97,9 @@ export class EventsController {
     @Param('id', ParseIntPipe) id: number,
     @OwnerId() ownerUserId: number,
   ) {
+    try {
+      this.logger.log(`publish called id=${id} by owner=${ownerUserId}`);
+    } catch (e) {}
     return this.eventsService.publish(id, { id: ownerUserId, isAdmin: false });
   }
 }
