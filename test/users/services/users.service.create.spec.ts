@@ -38,15 +38,19 @@ describe('UsersService', () => {
     it('should create a user', async () => {
       const dto = makeCreateUserDto({ password: 'password' });
       // ensure entity uses the same dto values (avoid internal seq mismatch)
-      const entity = makeUserEntity({
+      const entity: Partial<User> = makeUserEntity({
         ...dto,
         passwordHash: 'hashed-password',
         id: 1,
-      } as any) as any;
+      });
       repository.findOne.mockResolvedValue(null);
       // mocka o hash da senha
+      // spy on the internal hash method; cast to a minimal shape to avoid `any`
       jest
-        .spyOn<any, any>(service as any, 'hash')
+        .spyOn(
+          service as unknown as { hash: (p: string) => Promise<string> },
+          'hash',
+        )
         .mockResolvedValue('hashed-password');
       repository.create.mockReturnValue(entity);
       repository.save.mockResolvedValue(entity);
@@ -63,7 +67,7 @@ describe('UsersService', () => {
         email: entity.email,
         role: entity.role,
       });
-      expect((result as any).passwordHash).toBeUndefined();
+      expect((result as unknown as Partial<User>).passwordHash).toBeUndefined();
     });
 
     it('should throw a conflict exception if the user already exists', async () => {

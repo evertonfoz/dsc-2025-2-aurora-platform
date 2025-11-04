@@ -29,7 +29,9 @@ export class EventsController {
     @OwnerId() ownerUserId: number,
   ) {
     try {
-      this.logger.log(`create called by owner=${ownerUserId} title=${createEventDto.title}`);
+      this.logger.log(
+        `create called by owner=${ownerUserId} title=${createEventDto.title}`,
+      );
     } catch {
       /* ignore logging errors */
     }

@@ -23,14 +23,16 @@ describe('UsersController – patch', () => {
 
   it('PATCH /users/:id → delega ao service.update e retorna o usuário atualizado', async () => {
     const patchDto = { name: 'Joan Clarke' };
-    const patchedUser = makeUserEntity({
+    const patchedUser: Partial<
+      import('../../../src/users/entities/user.entity').User
+    > = makeUserEntity({
       id: 8,
       name: 'Joan Clarke',
       email: 'joan@bombe.com',
       role: UserRole.STUDENT,
-    } as any) as any;
+    });
     service.update.mockResolvedValue(patchedUser);
-    const res = await controller.patch('8', patchDto as any);
+    const res = await controller.patch('8', patchDto as Record<string, any>);
     expect(service.update).toHaveBeenCalledWith(8, patchDto);
     expectDtoMappedToEntity(
       {
@@ -39,18 +41,18 @@ describe('UsersController – patch', () => {
         email: 'joan@bombe.com',
         role: UserRole.STUDENT,
         isActive: true,
-      } as any,
-      res as any,
+      } as Record<string, any>,
+      res as Record<string, any>,
       ['id', 'name', 'email', 'role', 'isActive'],
     );
-    expectNoSensitiveFields(res as any);
+    expectNoSensitiveFields(res as Record<string, any>);
   });
 
   it('PATCH /users/:id → lança NotFoundException se usuário não existe', async () => {
     service.update.mockResolvedValue(undefined);
-    await expect(controller.patch('999', {} as any)).rejects.toThrow(
-      'Usuário não encontrado.',
-    );
+    await expect(
+      controller.patch('999', {} as Record<string, any>),
+    ).rejects.toThrow('Usuário não encontrado.');
     expect(service.update).toHaveBeenCalledWith(999, {});
   });
 });

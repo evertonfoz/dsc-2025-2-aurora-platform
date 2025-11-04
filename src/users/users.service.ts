@@ -143,6 +143,11 @@ export class UsersService {
     const pepper = process.env.HASH_PEPPER ?? '';
     const valid = await bcrypt.compare(password + pepper, user.passwordHash);
     if (!valid) return null;
-    return { id: user.id, email: user.email, name: user.name, roles: [user.role] };
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      roles: [user.role],
+    };
   }
 }

@@ -21,7 +21,7 @@ describe('AuthController – me', () => {
   });
 
   it('GET /auth/me → verifica token e delega a service.me', async () => {
-  jwt.verify.mockReturnValue({ sub: '7' });
+    jwt.verify.mockReturnValue({ sub: '7' });
     service.me.mockResolvedValue({ id: 7, email: 'ok@example.com' });
     const res = await controller.me('Bearer token');
     expect(jwt.verify).toHaveBeenCalled();
@@ -30,7 +30,7 @@ describe('AuthController – me', () => {
   });
 
   it('GET /auth/me → lança quando sem Bearer', async () => {
-    await expect(controller.me(undefined as any)).rejects.toThrow();
+    await expect(controller.me(undefined)).rejects.toThrow();
   });
 
   it('GET /auth/me → lança quando token inválido', async () => {

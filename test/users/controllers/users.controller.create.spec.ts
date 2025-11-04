@@ -13,7 +13,7 @@ import {
 } from '../../utils/asserts';
 describe('UsersController – create', () => {
   let controller: UsersController;
-  const service = { create: jest.fn() };
+  const service = { create: jest.fn() } as { create: jest.Mock };
 
   beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -26,9 +26,11 @@ describe('UsersController – create', () => {
 
   it('POST /users → delega ao service.create', async () => {
     const body = makeCreateUserDto({ role: UserRole.TEACHER });
-    const saved = makeUserEntity({ id: 1, ...body } as any) as any;
+    const saved: Partial<
+      import('../../../src/users/entities/user.entity').User
+    > = makeUserEntity({ id: 1, ...body });
     service.create.mockResolvedValue(saved);
-    const res = await controller.create(body as any);
+    const res = await controller.create(body);
     expect(service.create).toHaveBeenCalledWith(body);
     expectDtoMappedToEntity(
       {
@@ -37,10 +39,10 @@ describe('UsersController – create', () => {
         email: body.email,
         role: body.role,
         isActive: true,
-      } as any,
-      res as any,
+      } as Record<string, any>,
+      res as Record<string, any>,
       ['id', 'name', 'email', 'role', 'isActive'],
     );
-    expectNoSensitiveFields(res as any);
+    expectNoSensitiveFields(res as Record<string, any>);
   });
 });

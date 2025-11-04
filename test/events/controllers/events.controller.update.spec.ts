@@ -9,7 +9,7 @@ import {
 
 describe('EventsController – update', () => {
   let controller: EventsController;
-  const service = { update: jest.fn() } as any;
+  const service = { update: jest.fn() } as { update: jest.Mock };
 
   beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -22,28 +22,34 @@ describe('EventsController – update', () => {
 
   it('PATCH /events/:id → delega ao service.update e retorna evento atualizado', async () => {
     const updateDto = { title: 'Updated Title' };
-    const updated = makeEventEntity({
+    const updated: Partial<
+      import('../../../src/events/entities/event.entity').Event
+    > = makeEventEntity({
       id: 7,
       title: 'Updated Title',
-    } as any) as any;
+    });
     service.update.mockResolvedValue(updated);
 
-    const res = await controller.update(7 as any, updateDto as any, 7 as any);
+    const res = await controller.update(7, updateDto as Record<string, any>, 7);
     expect(service.update).toHaveBeenCalledWith(7, updateDto, {
       id: 7,
       isAdmin: false,
     });
     expectDtoMappedToEntity(
-      { id: 7, title: 'Updated Title' } as any,
-      res as any,
+      { id: 7, title: 'Updated Title' } as Record<string, any>,
+      res as Record<string, any>,
       ['id', 'title'],
     );
-    expectNoSensitiveFields(res as any);
+    expectNoSensitiveFields(res as Record<string, any>);
   });
 
   it('PATCH /events/:id → retorna undefined quando service retorna undefined (não lança)', async () => {
     service.update.mockResolvedValue(undefined);
-    const res = await controller.update('999' as any, {} as any, 1 as any);
+    const res = await controller.update(
+      '999' as unknown as number,
+      {} as Record<string, any>,
+      1,
+    );
     // Note: when calling controller methods directly in unit tests, pipes (ParseIntPipe) are not applied.
     expect(service.update).toHaveBeenCalledWith(
       '999',

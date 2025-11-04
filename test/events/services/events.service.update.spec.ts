@@ -26,7 +26,7 @@ describe('EventsService \u2013 update', () => {
   });
 
   it('updates event when requester is owner', async () => {
-    const existing: any = {
+    const existing: Partial<Event> = {
       id: 5,
       ownerUserId: 7,
       startsAt: new Date(Date.now()),
@@ -45,7 +45,7 @@ describe('EventsService \u2013 update', () => {
   });
 
   it('throws Forbidden when requester is not owner', async () => {
-    const existing: any = {
+    const existing: Partial<Event> = {
       id: 6,
       ownerUserId: 99,
       startsAt: new Date(),
