@@ -25,7 +25,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!resolvedSecret) {
       if (process.env.NODE_ENV === 'production') {
         // In production we want to fail fast if the secret is not configured.
-        throw new Error('JwtStrategy requires JWT_ACCESS_SECRET when running in production');
+        throw new Error(
+          'JwtStrategy requires JWT_ACCESS_SECRET when running in production',
+        );
       }
     }
 

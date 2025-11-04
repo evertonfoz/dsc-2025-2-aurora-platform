@@ -3,15 +3,17 @@
 @host = http://localhost:3001
 @apiBase = {{host}}/v1
 @eventId = 1
+@slug =
 @token = 
 
-### Get all Events
+### Get all Events (PROTECTED for this PR; could be PUBLIC if desired)
 GET {{apiBase}}/events
 Accept: application/json
 Authorization: Bearer {{token}}
 
-### Create Event (without slug)
+### Create Event (REQUIRES teacher|admin; ownerId comes from JWT sub, not body)
 POST {{apiBase}}/events
+Accept: application/json
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
@@ -24,17 +26,34 @@ Authorization: Bearer {{token}}
   "visibility": "public"
 }
 
-### Publish Event
+> {%
+// Persist variables from the create response (VS Code REST Client)
+// Adjust paths if your DTO differs.
+const body = JSON.parse(response.body);
+if (body?.id) client.global.set("eventId", body.id);
+if (body?.slug) client.global.set("slug", body.slug);
+%}
+
+### Publish Event (REQUIRES owner-or-admin)
 POST {{apiBase}}/events/{{eventId}}/publish
+Accept: application/json
 Authorization: Bearer {{token}}
 
-### List Published Events with filters
+> {%
+// Optionally refresh slug if publish returns it
+try {
+  const body = JSON.parse(response.body);
+  if (body?.slug) client.global.set("slug", body.slug);
+} catch {}
+%}
+
+### List Published Events with filters (PROTECTED for this PR; could be PUBLIC)
 GET {{apiBase}}/events?q=sample&from=2025-12-01T00:00:00Z&to=2025-12-31T23:59:59Z&page=1&limit=10
 Accept: application/json
 Authorization: Bearer {{token}}
 
-### Get Event by Slug
-GET {{apiBase}}/events/sample-event
+### Get Event by Slug (PROTECTED for this PR; could be PUBLIC)
+GET {{apiBase}}/events/{{slug}}
 Accept: application/json
 Authorization: Bearer {{token}}
 
@@ -42,3 +61,8 @@ Authorization: Bearer {{token}}
 # - Set `@token` to a valid JWT or leave empty for unsecured local testing.
 # - `@apiBase` includes `/v1` since many endpoints are versioned under `/v1`.
 # - Adjust `@host` if your server runs on a different port or host.
+# - RBAC esperado:
+#   • POST /events → teacher|admin (ownerId = JWT.sub no backend)
+#   • POST /events/:id/publish → owner-or-admin
+#   • GETs podem ser LOGADO (como neste PR) ou PUBLIC conforme política do curso.
+# - Dica: após criar, o bloco acima salva automaticamente `@eventId` e `@slug` das respostas.

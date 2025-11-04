@@ -9,6 +9,7 @@ import {
   UsePipes,
   ValidationPipe,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
@@ -16,8 +17,13 @@ import { LoginDto } from './dtos/login.dto';
 import { RefreshDto } from './dtos/refresh.dto';
 import { LogoutDto } from './dtos/logout.dto';
 import { JwtService } from '@nestjs/jwt';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('auth')
+@ApiTags('Auth')
+@ApiBearerAuth()
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
 export class AuthController {
   constructor(
@@ -50,6 +56,7 @@ export class AuthController {
   }
 
   @Get('me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   async me(@Headers('authorization') authz?: string) {
     if (!authz?.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing bearer token');

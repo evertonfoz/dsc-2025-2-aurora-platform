@@ -9,6 +9,8 @@ import {
   Put,
   Patch,
   Delete,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -23,6 +25,12 @@ import {
   ApiUnauthorizedResponse,
   ApiNotFoundResponse,
 } from '@nestjs/swagger';
+import { Roles } from '../common/decorators/roles.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import { OwnerId } from '../common/decorators/owner-id.decorator';
+import type { Request } from 'express';
 import { plainToInstance } from 'class-transformer';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -34,6 +42,7 @@ import { UserRole } from './enums/user-role.enum';
 import { PaginatedUsersResponseDto } from './dto/paginated-users-response.dto';
 
 @ApiTags('Users')
+@ApiBearerAuth()
 @Controller('users')
 export class UsersController {
   constructor(private readonly users: UsersService) {}
@@ -56,11 +65,28 @@ export class UsersController {
   @ApiOkResponse({ description: 'Usuário atualizado.', type: UserResponseDto })
   @ApiBadRequestResponse({ description: 'Payload ou ID inválido.' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   async patch(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
+    @OwnerId() requesterId: number,
+    @Req() req?: Request,
   ): Promise<UserResponseDto> {
-    const user = await this.users.update(Number(id), dto);
+    interface JwtUser {
+      id?: number;
+      roles?: string[];
+    }
+    const authUser = req?.user as unknown as JwtUser | undefined;
+    const authRoles = authUser?.roles;
+    const isAdmin = Array.isArray(authRoles) && authRoles.includes('admin');
+    const user =
+      requesterId == null
+        ? await this.users.update(Number(id), dto)
+        : await this.users.update(Number(id), dto, {
+            id: requesterId,
+            isAdmin,
+          });
     if (!user) {
       throw new NotFoundException('Usuário não encontrado.');
     }
@@ -76,11 +102,28 @@ export class UsersController {
   @ApiOkResponse({ description: 'Usuário atualizado.', type: UserResponseDto })
   @ApiBadRequestResponse({ description: 'Payload ou ID inválido.' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
+  @Put(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
+    @OwnerId() requesterId: number,
+    @Req() req?: Request,
   ): Promise<UserResponseDto> {
-    const user = await this.users.update(Number(id), dto);
+    interface JwtUser {
+      id?: number;
+      roles?: string[];
+    }
+    const authUser = req?.user as unknown as JwtUser | undefined;
+    const authRoles = authUser?.roles;
+    const isAdmin = Array.isArray(authRoles) && authRoles.includes('admin');
+    const user =
+      requesterId == null
+        ? await this.users.update(Number(id), dto)
+        : await this.users.update(Number(id), dto, {
+            id: requesterId,
+            isAdmin,
+          });
     if (!user) {
       throw new NotFoundException('Usuário não encontrado.');
     }
@@ -123,6 +166,9 @@ export class UsersController {
   @ApiForbiddenResponse({
     description: 'Sem permissão (se houver autorização).',
   })
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   async create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
     const user = await this.users.create(dto);
     return plainToInstance(UserResponseDto, user, {
@@ -189,6 +235,9 @@ export class UsersController {
   })
   @ApiUnauthorizedResponse({ description: 'Não autenticado (se aplicável).' })
   @ApiForbiddenResponse({ description: 'Sem permissão (se aplicável).' })
+  @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('teacher', 'admin')
   async findAll(
     @Query() query: PaginationQueryDto,
   ): Promise<PaginatedUsersResponseDto> {
@@ -214,8 +263,27 @@ export class UsersController {
   })
   @ApiBadRequestResponse({ description: 'ID inválido.' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
-  async findOne(@Param('id') id: string): Promise<UserResponseDto> {
-    const user = await this.users.findOne(Number(id));
+  @Get(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  async findOne(
+    @Param('id') id: string,
+    @OwnerId() requesterId: number,
+    @Req() req?: Request,
+  ): Promise<UserResponseDto> {
+    interface JwtUser {
+      id?: number;
+      roles?: string[];
+    }
+    const authUser = req?.user as unknown as JwtUser | undefined;
+    const authRoles = authUser?.roles;
+    const isAdmin = Array.isArray(authRoles) && authRoles.includes('admin');
+    const user =
+      requesterId == null
+        ? await this.users.findOne(Number(id))
+        : await this.users.findOne(Number(id), {
+            id: requesterId,
+            isAdmin,
+          });
     if (!user) {
       throw new NotFoundException('Usuário não encontrado.');
     }
@@ -234,8 +302,25 @@ export class UsersController {
   })
   @ApiBadRequestResponse({ description: 'ID inválido.' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
-  async remove(@Param('id') id: string): Promise<{ success: boolean }> {
-    const result = await this.users.remove(Number(id));
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  async remove(
+    @Param('id') id: string,
+    @OwnerId() requesterId: number,
+    @Req() req?: Request,
+  ): Promise<{ success: boolean }> {
+    interface JwtUser {
+      id?: number;
+      roles?: string[];
+    }
+    const authUser = req?.user as unknown as JwtUser | undefined;
+    const authRoles = authUser?.roles;
+    const isAdmin = Array.isArray(authRoles) && authRoles.includes('admin');
+    const result =
+      requesterId == null
+        ? await this.users.remove(Number(id))
+        : await this.users.remove(Number(id), { id: requesterId, isAdmin });
     if (!result) {
       throw new NotFoundException('Usuário não encontrado.');
     }

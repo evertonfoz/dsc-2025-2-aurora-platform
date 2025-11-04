@@ -1,10 +1,12 @@
 ### Environment variables
 @host = http://localhost:3001
 @apiBase = {{host}}/v1
-@token =
+@token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjMsImVtYWlsIjoidGVzdC51c2VyQGV4YW1wbGUuY29tIiwicm9sZXMiOlsic3R1ZGVudCJdLCJpYXQiOjE3NjIyNzExNTUsImV4cCI6MTc2MjI3MjA1NX0.J7zQMdl8s4k6RSyHY59yCXrhOtR2gFNKml-ccrBev8M"
+@refreshToken = "WcphTnWNTiRvbhelzUKAD_xUYCa3nAXVqhj7847Y9jTMfZjD-AiulUDlOEC8RqIJ"
 
-### POST /auth/login
+### POST /auth/login (PUBLIC)
 POST {{apiBase}}/auth/login
+Accept: application/json
 Content-Type: application/json
 
 {
@@ -12,23 +14,37 @@ Content-Type: application/json
   "password": "StrongP@ssw0rd"
 }
 
-### POST /auth/refresh
+### POST /auth/login (ADMIN)
+POST {{apiBase}}/auth/login
+Accept: application/json
+Content-Type: application/json
+
+{
+  "email": "admin.user@example.com",
+  "password": "AdminP@ss1"
+}
+
+
+
+### POST /auth/refresh (PUBLIC)
 POST {{apiBase}}/auth/refresh
+Accept: application/json
 Content-Type: application/json
 
 {
-  "refreshToken": "<paste-refresh-token-here>"
+  "refreshToken": "{{refreshToken}}"
 }
 
-### POST /auth/logout
+### POST /auth/logout (PUBLIC)
 POST {{apiBase}}/auth/logout
+Accept: application/json
 Content-Type: application/json
 
 {
-  "refreshToken": "<paste-refresh-token-here>"
+  "refreshToken": "{{refreshToken}}"
 }
 
-### GET /auth/me
+### GET /auth/me (PROTECTED)
 GET {{apiBase}}/auth/me
 Accept: application/json
 Authorization: Bearer {{token}}
