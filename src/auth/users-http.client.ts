@@ -18,24 +18,31 @@ export class UsersHttpClient {
   ): Promise<UsersIdentity | null> {
     // Ajuste para seu Users Service real (endpoint/rota)
     try {
-      const res = await axios.post(`${this.baseUrl}/users/validate`, {
-        email,
-        password,
-      });
+      const res = await axios.post<UsersIdentity | { data: UsersIdentity }>(
+        `${this.baseUrl}/users/validate`,
+        {
+          email,
+          password,
+        },
+      );
       // Accept both plain UsersIdentity or wrapped { data: UsersIdentity }
-      const payload = (res.data && (res.data.data ?? res.data)) as any;
+      const data = res.data as UsersIdentity | { data: UsersIdentity };
+      const payload: UsersIdentity | undefined = 'data' in data ? data.data : data;
       return payload?.id ? payload : null;
-    } catch {
+    } catch (_err) {
       return null;
     }
   }
 
   async getById(userId: number): Promise<UsersIdentity | null> {
     try {
-      const res = await axios.get(`${this.baseUrl}/users/${userId}`);
-      const payload = (res.data && (res.data.data ?? res.data)) as any;
+      const res = await axios.get<UsersIdentity | { data: UsersIdentity }>(
+        `${this.baseUrl}/users/${userId}`,
+      );
+      const data = res.data as UsersIdentity | { data: UsersIdentity };
+      const payload: UsersIdentity | undefined = 'data' in data ? data.data : data;
       return payload?.id ? payload : null;
-    } catch {
+    } catch (_err) {
       return null;
     }
   }
