@@ -12,9 +12,11 @@ export class RolesGuard implements CanActivate {
       ROLES_KEY,
       [context.getHandler(), context.getClass()],
     );
-    if (requiredRoles?.length === 0) {
-      return true;
-    }
+    // If no roles metadata is present, RolesGuard should not block —
+    // it only enforces role-based checks when @Roles(...) is used.
+    if (!requiredRoles) return true;
+    if (requiredRoles.length === 0) return true;
+
     const req = context
       .switchToHttp()
       .getRequest<Request & { user?: { roles?: string[] } }>();

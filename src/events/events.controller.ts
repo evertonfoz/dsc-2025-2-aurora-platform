@@ -9,21 +9,28 @@ import {
   ParseIntPipe,
   UseGuards,
   Logger,
+  Req,
 } from '@nestjs/common';
 import { EventsService } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { OwnerId } from '../common/decorators/owner-id.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import type { Request } from 'express';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('events')
+@ApiBearerAuth()
 export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
   private readonly logger = new Logger(EventsController.name);
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('teacher', 'admin')
   create(
     @Body() createEventDto: CreateEventDto,
     @OwnerId() ownerUserId: number,
@@ -39,6 +46,7 @@ export class EventsController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   findAll(
     @Query('q') q?: string,
     @Query('from') from?: string,
@@ -66,6 +74,7 @@ export class EventsController {
   }
 
   @Get(':idOrSlug')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   findOne(@Param('idOrSlug') idOrSlug: string) {
     try {
       this.logger.log(`findOne called with idOrSlug=${idOrSlug}`);
@@ -80,34 +89,50 @@ export class EventsController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateEventDto: UpdateEventDto,
     @OwnerId() ownerUserId: number,
+    @Req() req?: Request,
   ) {
     try {
       this.logger.log(`update called id=${id} by owner=${ownerUserId}`);
     } catch {
       /* ignore */
     }
+    interface JwtUser {
+      id?: number;
+      roles?: string[];
+    }
+    const user = req?.user as unknown as JwtUser | undefined;
+    const roles = user?.roles;
+    const isAdmin = Array.isArray(roles) && roles.includes('admin');
     return this.eventsService.update(id, updateEventDto, {
       id: ownerUserId,
-      isAdmin: false,
+      isAdmin,
     });
   }
 
   @Post(':id/publish')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   publish(
     @Param('id', ParseIntPipe) id: number,
     @OwnerId() ownerUserId: number,
+    @Req() req?: Request,
   ) {
     try {
       this.logger.log(`publish called id=${id} by owner=${ownerUserId}`);
     } catch {
       /* ignore */
     }
-    return this.eventsService.publish(id, { id: ownerUserId, isAdmin: false });
+    interface JwtUser {
+      id?: number;
+      roles?: string[];
+    }
+    const user = req?.user as unknown as JwtUser | undefined;
+    const roles = user?.roles;
+    const isAdmin = Array.isArray(roles) && roles.includes('admin');
+    return this.eventsService.publish(id, { id: ownerUserId, isAdmin });
   }
 }

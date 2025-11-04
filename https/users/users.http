@@ -4,19 +4,23 @@
 @apiBase = {{host}}/v1
 @userId = 1
 @token = 
+@refreshToken = 
 
-### List users
+
+
+### List users (REQUIRES teacher|admin)
 GET {{apiBase}}/users
 Accept: application/json
 Authorization: Bearer {{token}}
 
-### Get user by id
+### Get user by id (REQUIRES self-or-admin)
 GET {{apiBase}}/users/{{userId}}
 Accept: application/json
 Authorization: Bearer {{token}}
 
-### Create user
+### Create user (REQUIRES admin)
 POST {{apiBase}}/users
+Accept: application/json
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
@@ -24,20 +28,57 @@ Authorization: Bearer {{token}}
   "name": "Test User",
   "email": "test.user@example.com",
   "password": "StrongP@ssw0rd",
-  "role": "USER"
+  "role": "teacher"
+  // NOTE: If your Users API expects roles as an array (recommended with JWT canônico), use instead:
+  // "roles": ["student"]
 }
 
-### Update user (partial)
+### Create student user (for testing)
+POST {{apiBase}}/users
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Student User",
+  "email": "student.user@example.com",
+  "password": "StudentP@ss1",
+  "role": "student"
+  // NOTE: If your Users API expects roles as an array, use:
+  // "roles": ["student"]
+}
+
+
+### Create admin user (for testing)
+POST {{apiBase}}/users
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Admin User",
+  "email": "admin.user@example.com",
+  "password": "AdminP@ss1",
+  "role": "admin"
+  // NOTE: If your Users API expects roles as an array, use:
+  // "roles": ["admin"]
+}
+
+
+### Update user (partial) (REQUIRES self-or-admin)
 PATCH {{apiBase}}/users/{{userId}}
+Accept: application/json
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
   "name": "Updated Name"
+  // NOTE: When acting as "self", limit updatable fields (e.g., name). Admin may update broader fields per policy.
 }
 
-### Replace user
+### Replace user (PUT) (REQUIRES self-or-admin)
 PUT {{apiBase}}/users/{{userId}}
+Accept: application/json
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
@@ -46,13 +87,22 @@ Authorization: Bearer {{token}}
   "email": "replaced.user@example.com",
   "password": "AnotherP@ss1",
   "role": "USER"
+  // NOTE: If your schema uses roles array:
+  // "roles": ["student"]
 }
 
-### Delete user
+### Delete user (REQUIRES admin)
 DELETE {{apiBase}}/users/{{userId}}
+Accept: application/json
 Authorization: Bearer {{token}}
 
 # Notes
-# - Set `@token` to a valid JWT or leave empty for unsecured local testing.
+# - Set `@token` to a valid JWT or leave empty for unsecured local testing (will return 401 on protected routes).
+# - RBAC esperado:
+#   • GET /users → teacher|admin
+#   • GET /users/:id → self-or-admin (self = params.id === JWT.sub)
+#   • POST /users → admin
+#   • PATCH/PUT /users/:id → self-or-admin (service should enforce field limits for self)
+#   • DELETE /users/:id → admin
 # - Adjust `@host` if your server runs on a different port or host.
 # - By default requests now target `{{apiBase}}` which is `{{host}}/v1`.

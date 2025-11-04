@@ -32,7 +32,12 @@ describe('UsersController – patch', () => {
       role: UserRole.STUDENT,
     });
     service.update.mockResolvedValue(patchedUser);
-    const res = await controller.patch('8', patchDto as Record<string, any>);
+    const res = await controller.patch(
+      '8',
+      patchDto as unknown as Record<string, unknown>,
+      undefined as unknown as number,
+      undefined,
+    );
     expect(service.update).toHaveBeenCalledWith(8, patchDto);
     expectDtoMappedToEntity(
       {
@@ -41,17 +46,22 @@ describe('UsersController – patch', () => {
         email: 'joan@bombe.com',
         role: UserRole.STUDENT,
         isActive: true,
-      } as Record<string, any>,
-      res as Record<string, any>,
+      } as unknown as Record<string, unknown>,
+      res as unknown as Record<string, unknown>,
       ['id', 'name', 'email', 'role', 'isActive'],
     );
-    expectNoSensitiveFields(res as Record<string, any>);
+    expectNoSensitiveFields(res as unknown as Record<string, unknown>);
   });
 
   it('PATCH /users/:id → lança NotFoundException se usuário não existe', async () => {
     service.update.mockResolvedValue(undefined);
     await expect(
-      controller.patch('999', {} as Record<string, any>),
+      controller.patch(
+        '999',
+        {} as unknown as Record<string, unknown>,
+        undefined as unknown as number,
+        undefined,
+      ),
     ).rejects.toThrow('Usuário não encontrado.');
     expect(service.update).toHaveBeenCalledWith(999, {});
   });

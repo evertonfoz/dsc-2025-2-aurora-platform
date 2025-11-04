@@ -106,19 +106,38 @@ export class UsersService {
     };
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, requester?: { id: number; isAdmin: boolean }) {
     const user = await this.repo.findOne({ where: { id } });
     if (!user) throw new NotFoundException('Usuário não encontrado.');
+
+    // Enforce self-or-admin when requester provided
+    if (requester && requester.id !== id && !requester.isAdmin) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+
     return this.stripSensitive(user);
   }
-  async update(id: number, dto: Partial<CreateUserDto>) {
+
+  async update(
+    id: number,
+    dto: Partial<CreateUserDto>,
+    requester?: { id: number; isAdmin: boolean },
+  ) {
     const user = await this.repo.findOne({ where: { id } });
     if (!user) return undefined;
+
+    // Authorization: if requester provided, ensure self-or-admin
+    if (requester && requester.id !== id && !requester.isAdmin) {
+      // Not allowed to update other users
+      return undefined;
+    }
 
     // Atualiza campos permitidos
     if (dto.name !== undefined) user.name = this.normalizeName(dto.name);
     if (dto.email !== undefined) user.email = this.normalizeEmail(dto.email);
-    if (dto.role !== undefined) user.role = dto.role;
+    // Only admin can change role
+    if (dto.role !== undefined && (!requester || requester.isAdmin))
+      user.role = dto.role;
     if (dto.password !== undefined) {
       const pepper = process.env.HASH_PEPPER ?? '';
       user.passwordHash = await this.hash(dto.password + pepper);
@@ -127,9 +146,15 @@ export class UsersService {
     const saved = await this.repo.save(user);
     return this.stripSensitive(saved);
   }
-  async remove(id: number) {
+  async remove(id: number, requester?: { id: number; isAdmin: boolean }) {
     const user = await this.repo.findOne({ where: { id } });
     if (!user) return undefined;
+
+    // Only admin or self can remove (soft-delete) — but per policy only admin is allowed
+    if (requester && !requester.isAdmin) {
+      return undefined;
+    }
+
     user.isActive = false;
     const saved = await this.repo.save(user);
     return this.stripSensitive(saved);

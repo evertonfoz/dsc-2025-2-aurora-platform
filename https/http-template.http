@@ -3,35 +3,120 @@
 # Variables to define at the top:
 # - @host: base host (e.g. http://localhost:3001)
 # - @apiBase: API base including version (e.g. {{host}}/v1)
-# - @token: Bearer token if needed
+# - @token: Bearer token if needed (set after /auth/login)
 # - @resourceId: default resource id for examples
+# - @slug: optional, if your resource exposes slugs
+# - @q/@from/@to: optional filters for list endpoints
 
 @host = http://localhost:3001
 @apiBase = {{host}}/v1
-@token = 
+@token =
 @resourceId = 1
+@slug =
+@q =
+@from =
+@to =
 
-### Example: List resources
-GET {{apiBase}}/resources
+### Example: (optional) Login helper to populate {{token}} (PUBLIC)
+# Tip: keep one shared auth file in your workspace and run it first.
+# After a successful login, this block stores access/refresh in global vars.
+POST {{apiBase}}/auth/login
+Accept: application/json
+Content-Type: application/json
+
+{
+  "email": "test.user@example.com",
+  "password": "StrongP@ssw0rd"
+}
+
+> {%
+// VS Code REST Client: save tokens to globals for reuse across files.
+try {
+  const body = JSON.parse(response.body);
+  if (body?.accessToken) client.global.set("token", body.accessToken);
+  if (body?.refreshToken) client.global.set("refreshToken", body.refreshToken);
+} catch {}
+%}
+
+### Example: List resources (PROTECTED by default; flip to PUBLIC if policy allows)
+# RBAC: adjust @Roles on the controller; typical options:
+#   • public (no guard)
+#   • logged-in (JwtAuthGuard only)
+#   • role-based (RolesGuard + JwtAuthGuard): e.g., teacher|admin
+GET {{apiBase}}/resources?q={{q}}&from={{from}}&to={{to}}&page=1&limit=10
 Accept: application/json
 Authorization: Bearer {{token}}
 
-### Example: Get resource by id
+### Example: Get resource by id (PROTECTED)
+# RBAC suggestion: logged-in OR self-or-admin / owner-or-admin depending on domain
 GET {{apiBase}}/resources/{{resourceId}}
 Accept: application/json
 Authorization: Bearer {{token}}
 
-### Example: Create resource
+### Example: Create resource (PROTECTED)
+# RBAC suggestion: teacher|admin (or whichever roles can create)
+# Ownership: DO NOT send ownerId in the body; backend should derive from JWT.sub
 POST {{apiBase}}/resources
+Accept: application/json
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
   "name": "Example",
   "description": "Replace with actual body"
+  // Add other required fields here. Omit identifiers derived from token.
 }
 
+> {%
+// Persist variables from the create response (adjust keys to your DTO).
+try {
+  const body = JSON.parse(response.body);
+  if (body?.id) client.global.set("resourceId", body.id);
+  if (body?.slug) client.global.set("slug", body.slug);
+} catch {}
+%}
+
+### Example: Update resource (partial) (PROTECTED)
+# RBAC suggestion: owner-or-admin (service enforces ForbiddenException if not owner/admin)
+PATCH {{apiBase}}/resources/{{resourceId}}
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "description": "Updated description"
+}
+
+### Example: Replace resource (PUT) (PROTECTED)
+# RBAC suggestion: owner-or-admin
+PUT {{apiBase}}/resources/{{resourceId}}
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Replaced Name",
+  "description": "Replaced body"
+}
+
+### Example: Delete resource (PROTECTED)
+# RBAC suggestion: admin OR owner-or-admin per policy
+DELETE {{apiBase}}/resources/{{resourceId}}
+Accept: application/json
+Authorization: Bearer {{token}}
+
+### Example: Get resource by slug (if applicable) (PROTECTED or PUBLIC)
+# If your domain exposes slugs, set {{slug}} after create/publish responses above.
+GET {{apiBase}}/resources/{{slug}}
+Accept: application/json
+Authorization: Bearer {{token}}
+
 # Notes:
-# - Use `{{apiBase}}` instead of hardcoding `/v1` so the version is explicit
-# - Add `Accept` and `Authorization` headers where appropriate
-# - Keep variables at the top for easy editing by developers or CI
+# - Use `{{apiBase}}` instead of hardcoding `/v1` so the version is explicit.
+# - Keep variables at the top for easy editing by developers or CI.
+# - Add `Accept` and `Authorization` headers where appropriate.
+# - For PROTECTED endpoints:
+#     • Without {{token}} → expect 401 (JwtAuthGuard).
+#     • With {{token}} lacking the required role → expect 403 (RolesGuard / service-level ownership).
+# - Ownership/Self rules should be enforced in the SERVICE layer (e.g., owner-or-admin / self-or-admin),
+#   never trusting ownerId from the client body; derive from JWT.sub on the backend.
