@@ -1,7 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, CanActivate, ExecutionContext } from '@nestjs/common';
+import {
+  INestApplication,
+  CanActivate,
+  ExecutionContext,
+} from '@nestjs/common';
 import request from 'supertest';
 import { Server } from 'http';
+import { AppModule } from '../src/app.module';
 
 // TestAuthGuard reads a header `x-test-user` with a JSON payload describing
 // the test user to inject into request.user. This avoids modifying production
@@ -9,7 +14,9 @@ import { Server } from 'http';
 class TestAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest();
-    const header = req.get ? req.get('x-test-user') : req.headers?.['x-test-user'];
+    const header = req.get
+      ? req.get('x-test-user')
+      : req.headers?.['x-test-user'];
     if (!header) return false;
     try {
       req.user = JSON.parse(header as string);
@@ -26,7 +33,7 @@ describe('RBAC e2e (minimal)', () => {
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [require('../src/app.module').AppModule],
+      imports: [AppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();

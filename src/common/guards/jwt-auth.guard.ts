@@ -25,12 +25,12 @@ export class JwtAuthGuard extends AuthGuard('jwt') implements CanActivate {
       }
     >();
 
-    const authHeader = (request.get && request.get('authorization')) || '';
+    const authHeader = request.get?.('authorization') ?? '';
 
     if (process.env.NODE_ENV !== 'production') {
       // If there's an Authorization header, delegate to Passport so a real token
       // is validated even in dev.
-      if (authHeader && authHeader.startsWith('Bearer ')) {
+      if (authHeader?.startsWith('Bearer ')) {
         return super.canActivate(context) as boolean | Promise<boolean>;
       }
 

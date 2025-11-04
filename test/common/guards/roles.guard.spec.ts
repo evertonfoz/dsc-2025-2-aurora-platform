@@ -6,7 +6,7 @@ describe('RolesGuard', () => {
     getAllAndOverride: jest.fn(),
   } as any;
 
-  const guard = new RolesGuard(mockReflector as any);
+  const guard = new RolesGuard(mockReflector);
 
   function makeContext(user?: unknown): ExecutionContext {
     return {

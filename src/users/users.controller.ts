@@ -73,15 +73,20 @@ export class UsersController {
     @OwnerId() requesterId: number,
     @Req() req?: Request,
   ): Promise<UserResponseDto> {
-    const isAdmin = Array.isArray((req?.user as any)?.roles)
-      ? (req!.user as any).roles.includes('admin')
-      : false;
-    const user = requesterId == null
-      ? await this.users.update(Number(id), dto)
-      : await this.users.update(Number(id), dto, {
-          id: requesterId,
-          isAdmin,
-        });
+    interface JwtUser {
+      id?: number;
+      roles?: string[];
+    }
+    const authUser = req?.user as unknown as JwtUser | undefined;
+    const authRoles = authUser?.roles;
+    const isAdmin = Array.isArray(authRoles) && authRoles.includes('admin');
+    const user =
+      requesterId == null
+        ? await this.users.update(Number(id), dto)
+        : await this.users.update(Number(id), dto, {
+            id: requesterId,
+            isAdmin,
+          });
     if (!user) {
       throw new NotFoundException('Usuário não encontrado.');
     }
@@ -105,15 +110,20 @@ export class UsersController {
     @OwnerId() requesterId: number,
     @Req() req?: Request,
   ): Promise<UserResponseDto> {
-    const isAdmin = Array.isArray((req?.user as any)?.roles)
-      ? (req!.user as any).roles.includes('admin')
-      : false;
-    const user = requesterId == null
-      ? await this.users.update(Number(id), dto)
-      : await this.users.update(Number(id), dto, {
-          id: requesterId,
-          isAdmin,
-        });
+    interface JwtUser {
+      id?: number;
+      roles?: string[];
+    }
+    const authUser = req?.user as unknown as JwtUser | undefined;
+    const authRoles = authUser?.roles;
+    const isAdmin = Array.isArray(authRoles) && authRoles.includes('admin');
+    const user =
+      requesterId == null
+        ? await this.users.update(Number(id), dto)
+        : await this.users.update(Number(id), dto, {
+            id: requesterId,
+            isAdmin,
+          });
     if (!user) {
       throw new NotFoundException('Usuário não encontrado.');
     }
@@ -260,15 +270,20 @@ export class UsersController {
     @OwnerId() requesterId: number,
     @Req() req?: Request,
   ): Promise<UserResponseDto> {
-    const isAdmin = Array.isArray((req?.user as any)?.roles)
-      ? (req!.user as any).roles.includes('admin')
-      : false;
-    const user = requesterId == null
-      ? await this.users.findOne(Number(id))
-      : await this.users.findOne(Number(id), {
-          id: requesterId,
-          isAdmin,
-        });
+    interface JwtUser {
+      id?: number;
+      roles?: string[];
+    }
+    const authUser = req?.user as unknown as JwtUser | undefined;
+    const authRoles = authUser?.roles;
+    const isAdmin = Array.isArray(authRoles) && authRoles.includes('admin');
+    const user =
+      requesterId == null
+        ? await this.users.findOne(Number(id))
+        : await this.users.findOne(Number(id), {
+            id: requesterId,
+            isAdmin,
+          });
     if (!user) {
       throw new NotFoundException('Usuário não encontrado.');
     }
@@ -290,13 +305,22 @@ export class UsersController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  async remove(@Param('id') id: string, @OwnerId() requesterId: number, @Req() req?: Request): Promise<{ success: boolean }> {
-    const isAdmin = Array.isArray((req?.user as any)?.roles)
-      ? (req!.user as any).roles.includes('admin')
-      : false;
-    const result = requesterId == null
-      ? await this.users.remove(Number(id))
-      : await this.users.remove(Number(id), { id: requesterId, isAdmin });
+  async remove(
+    @Param('id') id: string,
+    @OwnerId() requesterId: number,
+    @Req() req?: Request,
+  ): Promise<{ success: boolean }> {
+    interface JwtUser {
+      id?: number;
+      roles?: string[];
+    }
+    const authUser = req?.user as unknown as JwtUser | undefined;
+    const authRoles = authUser?.roles;
+    const isAdmin = Array.isArray(authRoles) && authRoles.includes('admin');
+    const result =
+      requesterId == null
+        ? await this.users.remove(Number(id))
+        : await this.users.remove(Number(id), { id: requesterId, isAdmin });
     if (!result) {
       throw new NotFoundException('Usuário não encontrado.');
     }

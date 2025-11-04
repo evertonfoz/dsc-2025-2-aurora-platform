@@ -75,7 +75,7 @@ export class EventsController {
 
   @Get(':idOrSlug')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  findOne(@Param('idOrSlug') idOrSlug: string, @OwnerId() ownerUserId?: number, @Req() req?: Request) {
+  findOne(@Param('idOrSlug') idOrSlug: string) {
     try {
       this.logger.log(`findOne called with idOrSlug=${idOrSlug}`);
     } catch {
@@ -101,9 +101,13 @@ export class EventsController {
     } catch {
       /* ignore */
     }
-    const isAdmin = Array.isArray((req?.user as any)?.roles)
-      ? (req!.user as any).roles.includes('admin')
-      : false;
+    interface JwtUser {
+      id?: number;
+      roles?: string[];
+    }
+    const user = req?.user as unknown as JwtUser | undefined;
+    const roles = user?.roles;
+    const isAdmin = Array.isArray(roles) && roles.includes('admin');
     return this.eventsService.update(id, updateEventDto, {
       id: ownerUserId,
       isAdmin,
@@ -122,9 +126,13 @@ export class EventsController {
     } catch {
       /* ignore */
     }
-    const isAdmin = Array.isArray((req?.user as any)?.roles)
-      ? (req!.user as any).roles.includes('admin')
-      : false;
+    interface JwtUser {
+      id?: number;
+      roles?: string[];
+    }
+    const user = req?.user as unknown as JwtUser | undefined;
+    const roles = user?.roles;
+    const isAdmin = Array.isArray(roles) && roles.includes('admin');
     return this.eventsService.publish(id, { id: ownerUserId, isAdmin });
   }
 }

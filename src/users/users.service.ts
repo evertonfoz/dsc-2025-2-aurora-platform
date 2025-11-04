@@ -118,7 +118,11 @@ export class UsersService {
     return this.stripSensitive(user);
   }
 
-  async update(id: number, dto: Partial<CreateUserDto>, requester?: { id: number; isAdmin: boolean }) {
+  async update(
+    id: number,
+    dto: Partial<CreateUserDto>,
+    requester?: { id: number; isAdmin: boolean },
+  ) {
     const user = await this.repo.findOne({ where: { id } });
     if (!user) return undefined;
 
@@ -132,7 +136,8 @@ export class UsersService {
     if (dto.name !== undefined) user.name = this.normalizeName(dto.name);
     if (dto.email !== undefined) user.email = this.normalizeEmail(dto.email);
     // Only admin can change role
-    if (dto.role !== undefined && (!requester || requester.isAdmin)) user.role = dto.role;
+    if (dto.role !== undefined && (!requester || requester.isAdmin))
+      user.role = dto.role;
     if (dto.password !== undefined) {
       const pepper = process.env.HASH_PEPPER ?? '';
       user.passwordHash = await this.hash(dto.password + pepper);

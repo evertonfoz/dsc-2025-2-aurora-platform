@@ -30,7 +30,11 @@ describe('EventsController – update', () => {
     });
     service.update.mockResolvedValue(updated);
 
-  const res = await controller.update(7, updateDto as unknown as Record<string, unknown>, 7);
+    const res = await controller.update(
+      7,
+      updateDto as unknown as Record<string, unknown>,
+      7,
+    );
     expect(service.update).toHaveBeenCalledWith(7, updateDto, {
       id: 7,
       isAdmin: false,
@@ -51,7 +55,11 @@ describe('EventsController – update', () => {
       1,
     );
     // Note: when calling controller methods directly in unit tests, pipes (ParseIntPipe) are not applied.
-    expect(service.update).toHaveBeenCalledWith('999', {}, { id: 1, isAdmin: false });
+    expect(service.update).toHaveBeenCalledWith(
+      '999',
+      {},
+      { id: 1, isAdmin: false },
+    );
     expect(res).toBeUndefined();
   });
 });

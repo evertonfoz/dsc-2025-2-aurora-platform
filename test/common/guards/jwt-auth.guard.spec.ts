@@ -12,20 +12,20 @@ describe('JwtAuthGuard (dev behavior)', () => {
   }
 
   it('injects a fake user when NODE_ENV !== production', () => {
-  const prev = process.env.NODE_ENV;
-  const prevAuto = process.env.DEV_AUTO_AUTH;
-  process.env.NODE_ENV = 'test';
-  process.env.DEV_AUTO_AUTH = 'true';
+    const prev = process.env.NODE_ENV;
+    const prevAuto = process.env.DEV_AUTO_AUTH;
+    process.env.NODE_ENV = 'test';
+    process.env.DEV_AUTO_AUTH = 'true';
     const context = makeContext();
     const ok = guard.canActivate(context as ExecutionContext);
     // guard returns true in dev/test
     expect(ok).toBe(true);
-    const req = context.switchToHttp().getRequest() as unknown as Record<string, unknown>;
-    const user = (req as any).user;
+    const req = context.switchToHttp().getRequest();
+    const user = req.user;
     expect(user).toBeDefined();
-    expect(typeof (user as any).sub).toBe('number');
-  // restore
-  process.env.NODE_ENV = prev;
-  process.env.DEV_AUTO_AUTH = prevAuto;
+    expect(typeof user.sub).toBe('number');
+    // restore
+    process.env.NODE_ENV = prev;
+    process.env.DEV_AUTO_AUTH = prevAuto;
   });
 });

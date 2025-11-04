@@ -31,7 +31,11 @@ describe('UsersController – findOne', () => {
       role: UserRole.ADMIN,
     });
     service.findOne.mockResolvedValue(user);
-  const res = await controller.findOne('42', undefined as unknown as number, undefined);
+    const res = await controller.findOne(
+      '42',
+      undefined as unknown as number,
+      undefined,
+    );
     expect(service.findOne).toHaveBeenCalledWith(42);
     expectDtoMappedToEntity(
       {
@@ -49,9 +53,9 @@ describe('UsersController – findOne', () => {
 
   it('GET /users/:id → lança NotFoundException se usuário não existe', async () => {
     service.findOne.mockResolvedValue(undefined);
-    await expect(controller.findOne('999', undefined as unknown as number, undefined)).rejects.toThrow(
-      'Usuário não encontrado.',
-    );
+    await expect(
+      controller.findOne('999', undefined as unknown as number, undefined),
+    ).rejects.toThrow('Usuário não encontrado.');
     expect(service.findOne).toHaveBeenCalledWith(999);
   });
 });
