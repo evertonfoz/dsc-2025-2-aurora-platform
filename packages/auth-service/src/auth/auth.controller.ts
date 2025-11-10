@@ -12,13 +12,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { AuthService } from '../../../src/auth/auth.service';
+import { AuthService } from './auth.service';
 import { LoginDto } from './dtos/login.dto';
 import { RefreshDto } from './dtos/refresh.dto';
 import { LogoutDto } from './dtos/logout.dto';
 import { JwtService } from '@nestjs/jwt';
-import { JwtAuthGuard } from '../../../src/common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../src/common/guards/roles.guard';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('auth')
