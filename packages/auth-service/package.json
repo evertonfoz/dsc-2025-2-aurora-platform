@@ -1,0 +1,30 @@
+{
+  "name": "auth-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Scaffold do auth-service extraído do monolito para fins didáticos",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "test": "jest",
+    "contract:test": "jest --testPathPattern=contract",
+    "integration:test": "jest --testPathPattern=integration"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "yaml": "^2.2.1",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.2",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.0.0",
+    "supertest": "^6.3.3",
+    "@types/express": "^4.17.17",
+    "@types/supertest": "^2.0.12"
+  }
+}
