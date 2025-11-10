@@ -1,6 +1,6 @@
 import { createApp } from './app';
 
-const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+const port = process.env.PORT ? Number(process.env.PORT) : 3002;
 const app = createApp();
 
 if (require.main === module) {

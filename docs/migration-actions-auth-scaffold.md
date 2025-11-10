@@ -56,8 +56,8 @@ Instruções para execução em aula (resumo)
 	npm run dev
 
 	# ou via Docker
-	docker build -t auth-service:dev .
-	docker run --rm -p 3000:3000 auth-service:dev
+		docker build -t auth-service:dev .
+		docker run --rm -p 3002:3002 auth-service:dev
 
 - Rodar os testes:
 

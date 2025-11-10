@@ -52,12 +52,12 @@ npm install
 npm run dev          # start em modo dev (hot reload)
 # alternativa (Docker):
 docker build -t auth-service:dev .
-docker run --rm -p 3000:3000 auth-service:dev
+docker run --rm -p 3002:3002 auth-service:dev
 ```
 
 Verificações:
-- Acesse `http://localhost:3000/health` ou `curl http://localhost:3000/health`.
-- Teste manual: `curl -X POST http://localhost:3000/auth/login -d '{"email":"test@x.com","password":"x"}' -H 'Content-Type: application/json'`
+ - Acesse `http://localhost:3002/health` ou `curl http://localhost:3002/health`.
+ - Teste manual: `curl -X POST http://localhost:3002/auth/login -d '{"email":"test@x.com","password":"x"}' -H 'Content-Type: application/json'`
 
 Passo 2 — Testes (contrato + integração)
 
