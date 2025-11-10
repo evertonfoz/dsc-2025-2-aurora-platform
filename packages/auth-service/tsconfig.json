@@ -11,6 +11,4 @@
     "resolveJsonModule": true
   },
   "include": ["src/**/*", "test/**/*"]
-  ,
-  "exclude": ["src/auth/**", "extracted-auth/**"]
 }
