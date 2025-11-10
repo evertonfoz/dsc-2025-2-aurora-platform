@@ -12,5 +12,5 @@
   },
   "include": ["src/**/*", "test/**/*"]
   ,
-  "exclude": ["src/auth/**"]
+  "exclude": ["src/auth/**", "extracted-auth/**"]
 }
