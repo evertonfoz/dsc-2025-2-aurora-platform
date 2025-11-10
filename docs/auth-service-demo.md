@@ -81,6 +81,42 @@ Próximos passos sugeridos
 3. Preparar um `docker-compose` local de demonstração para rodar o monólito e o novo serviço lado a lado (modo comparativo) durante a aula.
 4. Opcional: adaptar os controllers copiados para o provider Express (ou portar o scaffold para Nest) para demonstrar a substituição do provider por provider real.
 
+Script de demonstração (opcional)
+-------------------------------------------------
+Para facilitar a execução em sala, você pode adicionar um script `demo` no `package.json` de `packages/auth-service`.
+
+Exemplo (`packages/auth-service/package.json` -> `scripts`):
+
+```json
+{
+  "scripts": {
+    "demo": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "contract:test": "jest --config jest.contract.config.js",
+    "integration:test": "jest --config jest.integration.config.js"
+  }
+}
+```
+
+Uso (a partir da raiz do pacote):
+```bash
+cd packages/auth-service
+npm run demo
+```
+
+Makefile (opcional) — útil para slides/execução rápida:
+```make
+demo:
+	cd packages/auth-service && npm run demo
+
+contract-test:
+	cd packages/auth-service && npm run contract:test
+
+integration-test:
+	cd packages/auth-service && npm run integration:test
+```
+
+Coloquei instruções e exemplos aqui no `docs/auth-service-demo.md`, mas se preferir eu posso também adicionar o `demo` script direto em `packages/auth-service/package.json` e commitar essa mudança; confirme se quer que eu faça isso.
+
 Notas finais
 - O objetivo deste scaffold é ser didático: validar contrato (OpenAPI) + behavior (mocked provider) antes de extrair o serviço real do monólito.
 - Se quiser, posso abrir um PR automatizado contra `new-release` com este arquivo de documentação ou adicionar um checklist/README específico dentro de `packages/auth-service` com passos para alunos.
