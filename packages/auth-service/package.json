@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+  "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+  "demo": "ts-node-dev --respawn --transpile-only src/main.ts",
     "test": "jest",
     "contract:test": "jest --testPathPattern=contract",
     "integration:test": "jest --testPathPattern=integration"

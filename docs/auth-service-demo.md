@@ -121,4 +121,9 @@ Notas finais
 - O objetivo deste scaffold é ser didático: validar contrato (OpenAPI) + behavior (mocked provider) antes de extrair o serviço real do monólito.
 - Se quiser, posso abrir um PR automatizado contra `new-release` com este arquivo de documentação ou adicionar um checklist/README específico dentro de `packages/auth-service` com passos para alunos.
 
+Atualizações aplicadas nesta sessão
+- Backup do README original criado em `packages/auth-service/README.original.md`.
+- README do pacote atualizado: `packages/auth-service/README.md` (passo-a-passo para alunos).
+- Script `demo` adicionado ao `packages/auth-service/package.json` (use `npm run demo`).
+
 Arquivo criado por automação de scaffold — revise e ajuste exemplos/campos sensíveis (chaves, formatos de token) conforme a necessidade da aula.
