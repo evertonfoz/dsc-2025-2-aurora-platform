@@ -10,23 +10,28 @@ import {
 } from 'class-validator';
 import { EventVisibility } from '../enums/event-visibility.enum';
 
-export class CreateEventDto {
+export class UpdateEventDto {
+  @IsOptional()
   @IsString()
   @Length(1, 180)
-  title: string;
+  title?: string;
 
+  @IsOptional()
   @IsString()
   @Length(1, 280)
-  summary: string;
+  summary?: string;
 
+  @IsOptional()
   @IsString()
-  description: string;
+  description?: string;
 
+  @IsOptional()
   @IsISO8601()
-  startsAt: string;
+  startsAt?: string;
 
+  @IsOptional()
   @IsISO8601()
-  endsAt: string;
+  endsAt?: string;
 
   @IsOptional()
   @IsISO8601()
