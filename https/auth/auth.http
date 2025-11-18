@@ -1,6 +1,6 @@
 ### Environment variables
-@host = http://localhost:3001
-@apiBase = {{host}}/v1
+@host = http://localhost:3010
+@apiBase = {{host}}
 @token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjMsImVtYWlsIjoidGVzdC51c2VyQGV4YW1wbGUuY29tIiwicm9sZXMiOlsic3R1ZGVudCJdLCJpYXQiOjE3NjIyNzExNTUsImV4cCI6MTc2MjI3MjA1NX0.J7zQMdl8s4k6RSyHY59yCXrhOtR2gFNKml-ccrBev8M"
 @refreshToken = "WcphTnWNTiRvbhelzUKAD_xUYCa3nAXVqhj7847Y9jTMfZjD-AiulUDlOEC8RqIJ"
 

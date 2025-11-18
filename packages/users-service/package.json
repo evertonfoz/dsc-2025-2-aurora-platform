@@ -2,14 +2,15 @@
   "name": "users-service",
   "version": "0.1.0",
   "private": true,
-  "main": "dist/server.js",
+  "main": "dist/main.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "dev": "npx ts-node -P tsconfig.nest.json src/main.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/main.js",
-    "start:dev": "npx ts-node -P tsconfig.nest.json src/main.ts",
-    "start:pm2": "pm2 start --name users-service --interpreter 'npx' -- src/main.ts -- -P tsconfig.nest.json"
+  "dev": "npx ts-node -P tsconfig.nest.json src/main.ts",
+  "build": "tsc -p tsconfig.json",
+  "start": "node dist/main.js",
+  "start:dev": "npx ts-node -P tsconfig.nest.json src/main.ts",
+  "start:prod": "node dist/main.js",
+  "start:pm2": "pm2 start --name users-service --interpreter 'npx' -- src/main.ts -- -P tsconfig.nest.json"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.9",
@@ -19,16 +20,12 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "cors": "^2.8.5",
-    "express": "^4.21.2",
-    "express-openapi-validator": "^5.6.0",
-    "express-validator": "^7.3.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.12",
-    "@types/express": "^4.17.17",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.4.2",
     "@types/uuid": "^9.0.2",
@@ -38,7 +35,7 @@
     "typescript": "^5.5.0",
     "yaml": "^2.8.1"
   },
-  "description": "Minimal provider PoC for users (Express + TypeScript). Mocked responses, no persistence.",
+  "description": "Minimal provider PoC for users (Nest + TypeScript). Mocked responses, no persistence.",
   "keywords": [],
   "author": "",
   "license": "ISC",

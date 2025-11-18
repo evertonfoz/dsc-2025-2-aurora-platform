@@ -22,13 +22,7 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
   // redirect root to docs (works with default Express adapter)
   try {
-    // get underlying Express instance and register redirect
-    // this is safe when using the default platform-express
-    // (if using Fastify, prefer creating a RootController)
     const httpAdapter = app.getHttpAdapter();
-    // httpAdapter.getInstance() returns the underlying express app
-    // when using platform-express
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const expressApp: any = httpAdapter.getInstance && httpAdapter.getInstance();
     if (expressApp && typeof expressApp.get === 'function') {
       expressApp.get('/', (req: Request, res: Response) => res.redirect('/docs'));
@@ -37,11 +31,9 @@ async function bootstrap() {
     // ignore if adapter doesn't expose getInstance
   }
 
-  const port = process.env.PORT || 3011;
-  await app.listen(port);
-  // eslint-disable-next-line no-console
+  const port = process.env.PORT ? Number(process.env.PORT) : 3011;
+  await app.listen(port, '0.0.0.0');
   console.log(`Users service listening on http://localhost:${port}`);
-  // eslint-disable-next-line no-console
   console.log(`Swagger docs available at http://localhost:${port}/docs`);
 }
 
