@@ -1,7 +1,8 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, Optional, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { UsersHttpClient } from '../users-http.client';
 
 export interface AuthUser {
   sub: number; // id do usuário (int do BD)
@@ -16,7 +17,7 @@ export type AccessTokenPayload = AuthUser & {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(@Optional() private readonly config?: ConfigService) {
+  constructor(@Optional() private readonly config?: ConfigService, private readonly users?: UsersHttpClient) {
     const resolvedSecret =
       config?.get<string>('JWT_ACCESS_SECRET') ?? process.env.JWT_ACCESS_SECRET;
 
@@ -35,8 +36,29 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(payload: AccessTokenPayload): AuthUser {
-    const { sub, email, roles } = payload;
+  async validate(payload: AccessTokenPayload): Promise<AuthUser> {
+    const { sub, email, roles, iat } = payload;
+    
+    // if users client available, check lastLogoutAt
+    if (this.users) {
+      try {
+        const u = await this.users.getById(sub);
+        
+        if (u?.lastLogoutAt) {
+          const last = Date.parse(u.lastLogoutAt) / 1000; // seconds
+          
+          if (iat <= last) {
+            throw new UnauthorizedException('Token revoked (user logged out)');
+          }
+        }
+      } catch (err) {
+        // if client fails, be conservative and allow (or revoke?). We'll treat failure as a pass.
+        if (err instanceof UnauthorizedException) {
+          throw err; // re-throw auth errors
+        }
+      }
+    }
+    
     return { sub, email, roles: Array.isArray(roles) ? roles : [] };
   }
 }

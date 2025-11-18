@@ -1,10 +1,24 @@
 ### Environment variables
 @host = http://localhost:3010
 @apiBase = {{host}}
-@token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjMsImVtYWlsIjoidGVzdC51c2VyQGV4YW1wbGUuY29tIiwicm9sZXMiOlsic3R1ZGVudCJdLCJpYXQiOjE3NjIyNzExNTUsImV4cCI6MTc2MjI3MjA1NX0.J7zQMdl8s4k6RSyHY59yCXrhOtR2gFNKml-ccrBev8M"
-@refreshToken = "WcphTnWNTiRvbhelzUKAD_xUYCa3nAXVqhj7847Y9jTMfZjD-AiulUDlOEC8RqIJ"
+
+# ========================================
+# CAPTURA AUTOMÁTICA DE TOKENS (REST Client extension)
+# ========================================
+# Os tokens são capturados automaticamente após executar POST /auth/login (PUBLIC).
+# Execute o login primeiro, depois as outras requisições usarão os tokens automaticamente.
+@token = {{login.response.body.$.accessToken}}
+@refreshToken = {{login.response.body.$.refreshToken}}
+
+# ========================================
+# OPÇÃO ALTERNATIVA: VALORES FIXOS (comentado)
+# ========================================
+# Se preferir usar tokens fixos, comente as linhas acima e descomente abaixo:
+# @token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjMsImVtYWlsIjoidGVzdC51c2VyQGV4YW1wbGUuY29tIiwicm9sZXMiOlsic3R1ZGVudCJdLCJpYXQiOjE3NjIyNzExNTUsImV4cCI6MTc2MjI3MjA1NX0.J7zQMdl8s4k6RSyHY59yCXrhOtR2gFNKml-ccrBev8M
+# @refreshToken = WcphTnWNTiRvbhelzUKAD_xUYCa3nAXVqhj7847Y9jTMfZjD-AiulUDlOEC8RqIJ
 
 ### POST /auth/login (PUBLIC)
+# @name login
 POST {{apiBase}}/auth/login
 Accept: application/json
 Content-Type: application/json
@@ -15,6 +29,7 @@ Content-Type: application/json
 }
 
 ### POST /auth/login (ADMIN)
+# @name loginAdmin
 POST {{apiBase}}/auth/login
 Accept: application/json
 Content-Type: application/json
@@ -24,9 +39,8 @@ Content-Type: application/json
   "password": "AdminP@ss1"
 }
 
-
-
 ### POST /auth/refresh (PUBLIC)
+# @name refresh
 POST {{apiBase}}/auth/refresh
 Accept: application/json
 Content-Type: application/json
@@ -49,6 +63,37 @@ GET {{apiBase}}/auth/me
 Accept: application/json
 Authorization: Bearer {{token}}
 
-# Notes:
-# - Use the login response to obtain accessToken/refreshToken.
-# - For web flows consider storing the refreshToken in an httpOnly cookie.
+# ========================================
+# INSTRUÇÕES DE USO:
+# ========================================
+# ⚠️ IMPORTANTE: Após fazer logout, você DEVE fazer login novamente para obter novos tokens!
+# As variáveis @token e @refreshToken NÃO são limpas automaticamente após logout.
+#
+# 1. Execute POST /auth/login (PUBLIC ou ADMIN) primeiro
+# 2. Copie o accessToken e refreshToken da resposta
+# 3. Substitua os valores das variáveis @token e @refreshToken no topo do arquivo
+# 4. Execute GET /auth/me para verificar se o token está válido
+# 5. Use POST /auth/refresh quando o accessToken expirar
+# 6. Use POST /auth/logout para revogar o refreshToken
+# 7. ⚠️ APÓS LOGOUT: Execute POST /auth/login novamente para obter novos tokens!
+#
+# CAPTURA AUTOMÁTICA (REST Client):
+# Para capturar automaticamente os tokens após o login, você pode substituir
+# as variáveis @token e @refreshToken no topo por:
+#   @token = {{login.response.body.$.accessToken}}
+#   @refreshToken = {{login.response.body.$.refreshToken}}
+# Isso funciona porque adicionamos `# @name login` na requisição de login.
+#
+# ORDEM RECOMENDADA DE TESTES:
+# 1. POST /auth/login (PUBLIC) → obter tokens
+# 2. GET /auth/me → verificar identidade
+# 3. POST /auth/refresh → rotacionar tokens
+# 4. GET /auth/me (com novo token) → confirmar novo accessToken
+# 5. POST /auth/logout → revogar refresh
+# 6. POST /auth/refresh (com token revogado) → deve falhar (401)
+#
+# NOTAS:
+# - accessToken expira em 15 minutos (configurável via JWT_ACCESS_EXPIRES_IN)
+# - refreshToken expira em 7 dias (configurável via REFRESH_EXPIRES_DAYS)
+# - Para fluxos web, considere armazenar refreshToken em cookie httpOnly
+# ========================================

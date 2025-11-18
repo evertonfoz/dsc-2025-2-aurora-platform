@@ -77,7 +77,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: { id: user.id, email: user.email, name: user.name },
+      user: { id: user.id, email: user.email, name: user.name, roles: user.roles ?? [] },
     };
   }
 
@@ -114,7 +114,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken: newRaw,
-      user: { id: user.id, email: user.email, name: user.name },
+      user: { id: user.id, email: user.email, name: user.name, roles: user.roles ?? [] },
     };
   }
 
@@ -137,6 +137,12 @@ export class AuthService {
 
     current.revokedAt = nowUtc();
     await this.refreshRepo.save(current);
+    try {
+      // mark lastLogoutAt on users service so access tokens issued before now are invalidated
+      await this.users.setLastLogoutAt(current.userId, new Date());
+    } catch (err) {
+      // ignore client failure here; logout succeeded on refresh token
+    }
     return { revoked: 1 };
   }
 

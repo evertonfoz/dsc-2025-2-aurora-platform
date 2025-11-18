@@ -6,6 +6,7 @@ export interface UsersIdentity {
   email: string;
   name?: string;
   roles?: string[];
+  lastLogoutAt?: string | null;
 }
 
 @Injectable()
@@ -42,6 +43,15 @@ export class UsersHttpClient {
       return payload?.id ? payload : null;
     } catch {
       return null;
+    }
+  }
+
+  async setLastLogoutAt(userId: number, date?: Date): Promise<boolean> {
+    try {
+      const res = await axios.patch(`${this.baseUrl}/users/${userId}/last-logout`, { lastLogoutAt: date?.toISOString() ?? new Date().toISOString() });
+      return res.status >= 200 && res.status < 300;
+    } catch (err) {
+      return false;
     }
   }
 }

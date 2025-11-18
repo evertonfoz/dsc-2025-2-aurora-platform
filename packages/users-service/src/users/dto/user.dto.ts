@@ -9,4 +9,10 @@ export class UserDto {
 
   @ApiPropertyOptional({ example: 'John Doe' })
   name?: string;
+
+  @ApiPropertyOptional({ example: ['student'] })
+  roles?: string[];
+
+  @ApiPropertyOptional({ example: '2025-11-18T23:00:00.000Z' })
+  lastLogoutAt?: string | null;
 }
