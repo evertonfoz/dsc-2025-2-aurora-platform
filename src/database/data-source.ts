@@ -35,7 +35,10 @@ const options: PostgresConnectionOptions = process.env.DATABASE_URL
       port: parseInt(process.env.DB_PORT ?? '5432', 10),
       username: process.env.DB_USER!,
       password: process.env.DB_PASS!,
-      database: process.env.DB_NAME!,
+    // Fallback to a shared DB name if DB_NAME is not set. When migrating
+    // to a single DB for all microservices, set DB_NAME to the shared
+    // DB (for example 'aurora_db').
+    database: process.env.DB_NAME ?? 'aurora_db',
       ssl: sslOptions,
     };
 
