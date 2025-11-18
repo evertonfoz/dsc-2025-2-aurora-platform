@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { Request, Response } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -30,7 +31,7 @@ async function bootstrap() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const expressApp: any = httpAdapter.getInstance && httpAdapter.getInstance();
     if (expressApp && typeof expressApp.get === 'function') {
-      expressApp.get('/', (req, res) => res.redirect('/docs'));
+      expressApp.get('/', (req: Request, res: Response) => res.redirect('/docs'));
     }
   } catch (err) {
     // ignore if adapter doesn't expose getInstance
