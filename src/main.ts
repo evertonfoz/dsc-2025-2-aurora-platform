@@ -39,24 +39,3 @@ bootstrap().catch((err) => {
   process.exitCode = 1;
 });
 
-
-  // Definir o prefixo global antes de configurar o Swagger
-  app.setGlobalPrefix('v1');
-
-  const config = new DocumentBuilder()
-    .setTitle('Users Service')
-    .setVersion('1.0')
-    .addTag('users')
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
-  await app.listen(process.env.PORT ?? 3001);
-}
-
-// trate a promise para não ficar “flutuante”
-bootstrap().catch((err) => {
-  // eslint-disable-next-line no-console
-  console.error('Nest bootstrap failed:', err);
-  process.exitCode = 1;
-});
