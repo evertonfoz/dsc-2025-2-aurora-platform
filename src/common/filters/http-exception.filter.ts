@@ -12,7 +12,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    
+
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
     let error = 'Error';
@@ -24,9 +24,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
         typeof exceptionResponse === 'object' &&
         exceptionResponse !== null &&
         'message' in exceptionResponse &&
-        typeof (exceptionResponse as Record<string, unknown>).message === 'string'
+        typeof (exceptionResponse as Record<string, unknown>).message ===
+          'string'
       ) {
-        message = (exceptionResponse as Record<string, unknown>).message as string;
+        message = (exceptionResponse as Record<string, unknown>)
+          .message as string;
       } else if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
       } else if (
@@ -45,13 +47,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       // Handle exceptions with status property (like some Passport errors)
       status = (exception as { status: number }).status;
       message =
-        (typeof (exception as { message?: string }).message === 'string' &&
-        (exception as { message?: string }).message)
+        typeof (exception as { message?: string }).message === 'string' &&
+        (exception as { message?: string }).message
           ? (exception as { message: string }).message
           : 'Error';
       error =
-        (typeof (exception as { name?: string }).name === 'string' &&
-        (exception as { name?: string }).name)
+        typeof (exception as { name?: string }).name === 'string' &&
+        (exception as { name?: string }).name
           ? (exception as { name: string }).name
           : 'Error';
     }

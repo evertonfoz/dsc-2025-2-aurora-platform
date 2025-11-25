@@ -38,7 +38,9 @@ describe('ServiceTokenGuard', () => {
   it('returns true when header matches SERVICE_TOKEN and injects user', () => {
     const prev = process.env.SERVICE_TOKEN;
     process.env.SERVICE_TOKEN = 's3cr3t-token';
-    const context = makeContextWithHeader({ 'x-service-token': 's3cr3t-token' });
+    const context = makeContextWithHeader({
+      'x-service-token': 's3cr3t-token',
+    });
     expect(guard.canActivate(context)).toBe(true);
     const req = context.switchToHttp().getRequest();
     expect(req.user).toBeDefined();

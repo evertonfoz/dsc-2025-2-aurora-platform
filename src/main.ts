@@ -10,7 +10,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use(helmet());
-  
+
   app.useGlobalInterceptors(
     new ClassSerializerInterceptor(app.get(Reflector)),
     new LoggingInterceptor(),
@@ -38,4 +38,3 @@ bootstrap().catch((err) => {
   console.error('Nest bootstrap failed:', err);
   process.exitCode = 1;
 });
-

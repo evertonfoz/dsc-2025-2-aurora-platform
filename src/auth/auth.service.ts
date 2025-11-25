@@ -29,7 +29,8 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly users: UsersHttpClient,
     // optional direct access to UsersService for internal updates (lastLogoutAt)
-    @Optional() private readonly usersService?: import('../users/users.service').UsersService,
+    @Optional()
+    private readonly usersService?: import('../users/users.service').UsersService,
   ) {}
 
   // Assina access token curto e stateless

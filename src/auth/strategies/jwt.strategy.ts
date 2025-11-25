@@ -19,7 +19,8 @@ export type AccessTokenPayload = AuthUser & {
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     @Optional() private readonly config?: ConfigService,
-    @Optional() private readonly usersService?: import('../../users/users.service').UsersService,
+    @Optional()
+    private readonly usersService?: import('../../users/users.service').UsersService,
   ) {
     // Resolve secret explicitly so we can throw in production when missing.
     const resolvedSecret =

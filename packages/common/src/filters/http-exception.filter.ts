@@ -49,12 +49,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message =
         (typeof (exception as { message?: string }).message === 'string' &&
         (exception as { message?: string }).message)
-          ? (exception as { message: string }).message
+          ? (exception as unknown as { message: string }).message
           : 'Error';
       error =
         (typeof (exception as { name?: string }).name === 'string' &&
         (exception as { name?: string }).name)
-          ? (exception as { name: string }).name
+          ? (exception as unknown as { name: string }).name
           : 'Error';
     }
 

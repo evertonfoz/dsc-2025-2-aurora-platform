@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
 
@@ -25,7 +30,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') implements CanActivate {
           return (await super.canActivate(context)) as boolean;
         } catch {
           // Re-throw any authentication errors
-          throw new UnauthorizedException('Invalid or missing authentication token');
+          throw new UnauthorizedException(
+            'Invalid or missing authentication token',
+          );
         }
       }
 
@@ -36,14 +43,18 @@ export class JwtAuthGuard extends AuthGuard('jwt') implements CanActivate {
       }
 
       // No auth header and auto-auth disabled: deny access
-      throw new UnauthorizedException('Missing or invalid authentication token');
+      throw new UnauthorizedException(
+        'Missing or invalid authentication token',
+      );
     }
 
     // In production, always validate via Passport
     try {
       return (await super.canActivate(context)) as boolean;
     } catch {
-      throw new UnauthorizedException('Invalid or missing authentication token');
+      throw new UnauthorizedException(
+        'Invalid or missing authentication token',
+      );
     }
   }
 }
