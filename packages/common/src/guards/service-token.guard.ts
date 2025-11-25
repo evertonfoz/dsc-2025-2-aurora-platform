@@ -1,27 +1,31 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Optional } from '@nestjs/common';
-import { Request } from 'express';
-import jwt from 'jsonwebtoken';
-import { ConfigService } from '@nestjs/config';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 
 @Injectable()
 export class ServiceTokenGuard implements CanActivate {
-  constructor(@Optional() private readonly config?: ConfigService) {}
-
   canActivate(context: ExecutionContext): boolean {
-    const req = context.switchToHttp().getRequest<Request>();
-    const auth = req.get('authorization') ?? req.get('Authorization');
-    if (!auth || !auth.startsWith('Bearer ')) return false;
-    const token = auth.slice(7).trim();
-    const secret = this.config?.get<string>('SERVICE_TOKEN_SECRET') ?? process.env.SERVICE_TOKEN_SECRET;
-    const resolved = secret ?? 'dev_service_secret';
-
-    try {
-      const payload = jwt.verify(token, resolved) as any;
-      // simple claim to ensure it's a service token
-      if (!payload || !payload.service) throw new Error('not service token');
-      return true;
-    } catch (err) {
-      throw new UnauthorizedException('Invalid service token');
+    const req = context.switchToHttp().getRequest();
+    const header = req.headers['x-service-token'] || req.headers['X-Service-Token'];
+    const token = Array.isArray(header) ? header[0] : header;
+    const expected = process.env.SERVICE_TOKEN;
+    // If server is configured with the insecure default token, refuse and ask
+    // operator to set a real secret. This prevents accepting the shipped
+    // example secret by accident.
+    const insecureDefault = 'change-me-to-a-strong-secret';
+    if (!expected || expected === insecureDefault) {
+      // Do not echo the token value in logs.
+      // Fail closed: require a proper SERVICE_TOKEN in the environment.
+      throw new HttpException('Service token not configured properly', HttpStatus.UNAUTHORIZED);
     }
+
+    if (String(token) !== String(expected)) {
+      throw new HttpException('Service token required', HttpStatus.UNAUTHORIZED);
+    }
+    return true;
   }
 }

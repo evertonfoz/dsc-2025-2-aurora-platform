@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   UnauthorizedException,
+  HttpException,
   Patch,
   Delete,
   Query,
@@ -35,7 +36,19 @@ export class UsersController {
   @ApiOperation({ summary: 'Validate credentials' })
   @ApiResponse({ status: 200, description: 'Valid credentials', type: UserDto })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  validate(@Body() dto: ValidateUserDto) {
+  validate(@Body() dto: ValidateUserDto, @Req() req: any) {
+    // Check service token
+    const header = req.headers['x-service-token'] || req.headers['X-Service-Token'];
+    const token = Array.isArray(header) ? header[0] : header;
+    const expected = process.env.SERVICE_TOKEN;
+    const insecureDefault = 'change-me-to-a-strong-secret';
+    if (!expected || expected === insecureDefault) {
+      throw new HttpException('Service token not configured properly', HttpStatus.UNAUTHORIZED);
+    }
+    if (String(token) !== String(expected)) {
+      throw new HttpException('Service token required', HttpStatus.UNAUTHORIZED);
+    }
+
     const user = this.usersService.validateCredentials(dto.email, dto.password);
     if (!user) throw new UnauthorizedException('Invalid credentials');
     return user;

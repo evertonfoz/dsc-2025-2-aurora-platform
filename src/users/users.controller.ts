@@ -27,7 +27,7 @@ import {
 } from '@nestjs/swagger';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UseGuards } from '@nestjs/common';
-import { ServiceTokenGuard } from '../common/guards/service-token.guard';
+import { ServiceTokenGuard } from '@aurora/common';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ApiBearerAuth } from '@nestjs/swagger';
