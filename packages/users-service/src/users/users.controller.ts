@@ -38,7 +38,7 @@ export class UsersController {
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   validate(@Body() dto: ValidateUserDto, @Req() req: any) {
     // Check service token
-    const header = req.headers['x-service-token'] || req.headers['X-Service-Token'];
+    const header = req.headers['x-service-token'] ?? req.headers['X-Service-Token'];
     const token = Array.isArray(header) ? header[0] : header;
     const expected = process.env.SERVICE_TOKEN;
     const insecureDefault = 'change-me-to-a-strong-secret';
