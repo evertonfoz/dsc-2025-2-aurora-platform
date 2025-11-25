@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, IsNull } from 'typeorm';
@@ -27,6 +28,9 @@ export class AuthService {
     private readonly refreshRepo: Repository<RefreshToken>,
     private readonly jwt: JwtService,
     private readonly users: UsersHttpClient,
+    // optional direct access to UsersService for internal updates (lastLogoutAt)
+    @Optional()
+    private readonly usersService?: import('../users/users.service').UsersService,
   ) {}
 
   // Assina access token curto e stateless
@@ -146,6 +150,15 @@ export class AuthService {
 
     current.revokedAt = nowUtc();
     await this.refreshRepo.save(current);
+
+    // Update user's last logout timestamp so access tokens issued before
+    // this moment are considered invalid by JwtStrategy.
+    try {
+      await this.usersService?.setLastLogoutAt(current.userId, nowUtc());
+    } catch {
+      // Non-fatal: best-effort update. Do not break logout if this fails.
+    }
+
     return { revoked: 1 };
   }
 

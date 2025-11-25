@@ -36,4 +36,8 @@ export class UserResponseDto {
   @ApiProperty()
   @Expose()
   updatedAt!: Date;
+
+  @ApiProperty({ nullable: true })
+  @Expose()
+  lastLogoutAt!: Date | null;
 }

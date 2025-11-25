@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { UsersHttpClient } from './users-http.client';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       secret: process.env.JWT_ACCESS_SECRET ?? 'dev_access_secret',
       signOptions: { expiresIn: 900 },
     }),
+    UsersModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, UsersHttpClient, JwtStrategy],

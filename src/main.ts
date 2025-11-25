@@ -10,6 +10,7 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use(helmet());
+
   app.useGlobalInterceptors(
     new ClassSerializerInterceptor(app.get(Reflector)),
     new LoggingInterceptor(),
@@ -31,7 +32,7 @@ async function bootstrap() {
   await app.listen(process.env.PORT ?? 3001);
 }
 
-// trate a promise para não ficar “flutuante”
+// trate a promise para não ficar "flutuante"
 bootstrap().catch((err) => {
   // eslint-disable-next-line no-console
   console.error('Nest bootstrap failed:', err);

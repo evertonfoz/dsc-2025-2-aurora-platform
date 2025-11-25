@@ -19,6 +19,7 @@ import { LogoutDto } from './dtos/logout.dto';
 import { JwtService } from '@nestjs/jwt';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { ServiceTokenGuard } from '../common/guards/service-token.guard';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @Controller('auth')
@@ -51,6 +52,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @UseGuards(ServiceTokenGuard)
   async logout(@Body() dto: LogoutDto) {
     return this.auth.logout(dto.refreshToken);
   }

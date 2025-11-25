@@ -13,21 +13,31 @@ export class EnableCitextAndUsersEmailCitext1729090000000
     // Wrap all changes in a single DO block so the migration is safe when the users table is not yet present.
     await queryRunner.query(
       `DO $$
+      DECLARE
+        users_reg regclass;
       BEGIN
-        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users') THEN
-          IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_email_key') THEN
-            ALTER TABLE users DROP CONSTRAINT users_email_key;
-          END IF;
-          IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'users_email_idx') THEN
-            DROP INDEX users_email_idx;
-          END IF;
+        -- Check for users table in the current search_path schema using to_regclass
+        users_reg := to_regclass(current_schema() || '.users');
+        IF users_reg IS NOT NULL THEN
+          -- Only proceed if email column exists in the current schema.users
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'email'
+          ) THEN
+            IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_email_key') THEN
+              EXECUTE format('ALTER TABLE %s.users DROP CONSTRAINT users_email_key', current_schema());
+            END IF;
+            IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'users_email_idx') THEN
+              EXECUTE format('DROP INDEX %s.users_email_idx', current_schema());
+            END IF;
 
-          -- Alter column to citext
-          EXECUTE 'ALTER TABLE users ALTER COLUMN email TYPE citext';
+            -- Alter column to citext
+            EXECUTE format('ALTER TABLE %s.users ALTER COLUMN email TYPE citext', current_schema());
 
-          -- Recreate unique constraint on email if needed
-          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_email_key') THEN
-            ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE (email);
+            -- Recreate unique constraint on email if needed
+            IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_email_key') THEN
+              EXECUTE format('ALTER TABLE %s.users ADD CONSTRAINT users_email_key UNIQUE (email)', current_schema());
+            END IF;
           END IF;
         END IF;
       END$$;`,

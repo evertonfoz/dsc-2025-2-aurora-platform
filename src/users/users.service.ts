@@ -146,6 +146,20 @@ export class UsersService {
     const saved = await this.repo.save(user);
     return this.stripSensitive(saved);
   }
+
+  // Set lastLogoutAt timestamp for a user (used by AuthService on logout)
+  async setLastLogoutAt(id: number, date: Date) {
+    const user = await this.repo.findOne({ where: { id } });
+    if (!user) return undefined;
+    user.lastLogoutAt = date;
+    await this.repo.save(user);
+    return this.stripSensitive(user);
+  }
+
+  // Return raw entity (including lastLogoutAt) when needed by internal checks
+  async getEntityById(id: number) {
+    return this.repo.findOne({ where: { id } });
+  }
   async remove(id: number, requester?: { id: number; isAdmin: boolean }) {
     const user = await this.repo.findOne({ where: { id } });
     if (!user) return undefined;

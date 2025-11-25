@@ -6,11 +6,12 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: aurora_users
+      POSTGRES_DB: aurora_db
     ports:
       - '5432:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
       interval: 5s
@@ -19,26 +20,97 @@ services:
     networks:
       - aurora_network
 
-  app:
-    build: .
-    container_name: aurora_app
+  # `app` service removed — use per-package services (e.g. `events-service`) instead.
+
+  events-service:
+    build:
+      context: .
+      dockerfile: ./packages/events-service/Dockerfile
+    container_name: aurora_events_service
     restart: unless-stopped
     ports:
-      - '3001:3001'
+      - '3012:3012'
     environment:
       DB_HOST: db
       DB_PORT: 5432
- 
-      PORT: 3001
+      DB_NAME: aurora_db
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_SCHEMA: events
+      PORT: 3012
       NODE_ENV: development
-      USERS_API_URL: http://localhost:3001/v1
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - ./:/app
-      - /app/node_modules
+    # development mount removed so the container runs the built image
+    # volumes:
+    #  - ./packages/events-service:/app
+    #  - /app/node_modules
     command: npm run start:dev
+    networks:
+      - aurora_network
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: ./packages/auth-service/Dockerfile
+    container_name: aurora_auth_service
+    restart: unless-stopped
+    ports:
+      - '3010:3010'
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: aurora_db
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_SCHEMA: auth
+      PORT: 3010
+      NODE_ENV: development
+      USERS_API_URL: 'http://users-service:3011'
+      DEV_AUTO_AUTH: 'true'
+      # Pass SERVICE_TOKEN from the host environment into the container
+      SERVICE_TOKEN: ${SERVICE_TOKEN}
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    # development mount removed so the container runs the built image
+    # volumes:
+    #   - ./packages/auth-service:/app
+    #   - /app/node_modules
+    command: "node dist/src/main.js"
+    networks:
+      - aurora_network
+  
+  users-service:
+    build:
+      context: .
+      dockerfile: ./packages/users-service/Dockerfile
+    container_name: aurora_users_service
+    restart: unless-stopped
+    ports:
+      - '3011:3011'
+    environment:
+      PORT: 3011
+      NODE_ENV: development
+      # Pass SERVICE_TOKEN from the host environment into the container
+      SERVICE_TOKEN: ${SERVICE_TOKEN}
+      # Database connection for in-docker networking
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: aurora_db
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_SCHEMA: users
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    # do not mount local source nor override command so the image runs the compiled Nest app
+    command: "npm run start:prod"
     networks:
       - aurora_network
 

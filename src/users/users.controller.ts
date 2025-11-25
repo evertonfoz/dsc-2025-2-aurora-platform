@@ -13,22 +13,15 @@ import {
   Req,
 } from '@nestjs/common';
 import {
-  ApiBadRequestResponse,
-  ApiBody,
-  ApiConflictResponse,
-  ApiCreatedResponse,
-  ApiForbiddenResponse,
-  ApiOkResponse,
+  ApiBearerAuth,
   ApiOperation,
-  ApiQuery,
+  ApiResponse,
   ApiTags,
-  ApiUnauthorizedResponse,
-  ApiNotFoundResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../common/decorators/roles.decorator';
+import { ServiceTokenGuard } from '../common/guards/service-token.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { ApiBearerAuth } from '@nestjs/swagger';
 import { OwnerId } from '../common/decorators/owner-id.decorator';
 import type { Request } from 'express';
 import { plainToInstance } from 'class-transformer';
@@ -38,7 +31,6 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { ValidateUserDto } from './dto/validate-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
-import { UserRole } from './enums/user-role.enum';
 import { PaginatedUsersResponseDto } from './dto/paginated-users-response.dto';
 
 @ApiTags('Users')
@@ -62,11 +54,11 @@ export class UsersController {
     summary: 'Atualizar parcialmente usuário',
     description: 'Atualiza parcialmente os dados de um usuário pelo ID.',
   })
-  @ApiOkResponse({ description: 'Usuário atualizado.', type: UserResponseDto })
-  @ApiBadRequestResponse({ description: 'Payload ou ID inválido.' })
-  @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
+  @ApiResponse({ description: 'Usuário atualizado.', type: UserResponseDto })
+  @ApiResponse({ description: 'Payload ou ID inválido.' })
+  @ApiResponse({ description: 'Usuário não encontrado.' })
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(ServiceTokenGuard, JwtAuthGuard, RolesGuard)
   async patch(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
@@ -99,11 +91,11 @@ export class UsersController {
     summary: 'Atualizar usuário (total)',
     description: 'Atualiza todos os dados de um usuário pelo ID.',
   })
-  @ApiOkResponse({ description: 'Usuário atualizado.', type: UserResponseDto })
-  @ApiBadRequestResponse({ description: 'Payload ou ID inválido.' })
-  @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
+  @ApiResponse({ description: 'Usuário atualizado.', type: UserResponseDto })
+  @ApiResponse({ description: 'Payload ou ID inválido.' })
+  @ApiResponse({ description: 'Usuário não encontrado.' })
   @Put(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(ServiceTokenGuard, JwtAuthGuard, RolesGuard)
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
@@ -138,36 +130,22 @@ export class UsersController {
     description:
       'Cria um usuário com name, email, password e role (opcional). Retorna o usuário sem o hash da senha.',
   })
-  @ApiBody({
-    type: CreateUserDto,
-    examples: {
-      exemploBasico: {
-        summary: 'Exemplo completo',
-        value: {
-          name: 'Ada Lovelace',
-          email: 'ada@example.com',
-          password: 's3nh@-forte',
-          role: 'teacher',
-        },
-      },
-    },
-  })
-  @ApiCreatedResponse({
+  @ApiResponse({
     description: 'Usuário criado com sucesso.',
     type: UserResponseDto,
   })
-  @ApiBadRequestResponse({
+  @ApiResponse({
     description: 'Payload inválido (validação do DTO).',
   })
-  @ApiConflictResponse({ description: 'E-mail já registrado.' })
-  @ApiUnauthorizedResponse({
+  @ApiResponse({ description: 'E-mail já registrado.' })
+  @ApiResponse({
     description: 'Não autenticado (se houver autenticação).',
   })
-  @ApiForbiddenResponse({
+  @ApiResponse({
     description: 'Sem permissão (se houver autorização).',
   })
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(ServiceTokenGuard, JwtAuthGuard, RolesGuard)
   @Roles('admin')
   async create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
     const user = await this.users.create(dto);
@@ -177,6 +155,7 @@ export class UsersController {
   }
 
   @Post('validate')
+  @UseGuards(ServiceTokenGuard)
   async validate(@Body() dto: ValidateUserDto) {
     const identity = await this.users.validateCredentials(
       dto.email,
@@ -192,51 +171,17 @@ export class UsersController {
     description:
       'Retorna usuários paginados. Filtros: `q` (busca em name/email, case-insensitive), `role` e `isActive`. Ordenado por `createdAt DESC`.',
   })
-  @ApiQuery({
-    name: 'q',
-    required: false,
-    description: 'Busca textual (aplica OR em name e email, ILIKE)',
-    example: 'ana',
-  })
-  @ApiQuery({
-    name: 'role',
-    required: false,
-    description: 'Filtra por papel',
-    enum: UserRole,
-    example: UserRole.TEACHER,
-  })
-  @ApiQuery({
-    name: 'isActive',
-    required: false,
-    description: 'Filtra por status ativo',
-    type: Boolean,
-    example: true,
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    description: 'Página (>= 1). Default: 1',
-    type: Number,
-    example: 1,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Itens por página. Default: 20 (faixa recomendada: 1..100)',
-    type: Number,
-    example: 20,
-  })
-  @ApiOkResponse({
+  @ApiResponse({
     description: 'Lista paginada de usuários.',
     type: PaginatedUsersResponseDto,
   })
-  @ApiBadRequestResponse({
+  @ApiResponse({
     description: 'Parâmetros inválidos (validação do DTO).',
   })
-  @ApiUnauthorizedResponse({ description: 'Não autenticado (se aplicável).' })
-  @ApiForbiddenResponse({ description: 'Sem permissão (se aplicável).' })
+  @ApiResponse({ description: 'Não autenticado (se aplicável).' })
+  @ApiResponse({ description: 'Sem permissão (se aplicável).' })
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(ServiceTokenGuard, JwtAuthGuard, RolesGuard)
   @Roles('teacher', 'admin')
   async findAll(
     @Query() query: PaginationQueryDto,
@@ -257,14 +202,14 @@ export class UsersController {
     summary: 'Buscar usuário por ID',
     description: 'Retorna os dados de um usuário específico pelo ID.',
   })
-  @ApiOkResponse({
+  @ApiResponse({
     description: 'Usuário encontrado.',
     type: UserResponseDto,
   })
-  @ApiBadRequestResponse({ description: 'ID inválido.' })
-  @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
+  @ApiResponse({ description: 'ID inválido.' })
+  @ApiResponse({ description: 'Usuário não encontrado.' })
   @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(ServiceTokenGuard, JwtAuthGuard, RolesGuard)
   async findOne(
     @Param('id') id: string,
     @OwnerId() requesterId: number,
@@ -296,14 +241,14 @@ export class UsersController {
     summary: 'Remover (soft delete) usuário',
     description: 'Marca o usuário como inativo (soft delete) pelo ID.',
   })
-  @ApiOkResponse({
+  @ApiResponse({
     description: 'Usuário removido (inativado).',
     schema: { example: { success: true } },
   })
-  @ApiBadRequestResponse({ description: 'ID inválido.' })
-  @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
+  @ApiResponse({ description: 'ID inválido.' })
+  @ApiResponse({ description: 'Usuário não encontrado.' })
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(ServiceTokenGuard, JwtAuthGuard, RolesGuard)
   @Roles('admin')
   async remove(
     @Param('id') id: string,
