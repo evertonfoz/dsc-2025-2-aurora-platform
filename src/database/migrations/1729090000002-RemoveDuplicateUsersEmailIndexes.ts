@@ -4,7 +4,7 @@ export class RemoveDuplicateUsersEmailIndexes1729090000002
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    -- Make operations schema-aware and safe: check current_schema for users
+    // Make operations schema-aware and safe: check current_schema for users
     await queryRunner.query(`DO $$
     DECLARE r RECORD;
       users_reg regclass;

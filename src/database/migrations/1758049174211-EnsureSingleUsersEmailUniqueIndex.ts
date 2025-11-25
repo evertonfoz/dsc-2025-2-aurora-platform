@@ -4,7 +4,7 @@ export class EnsureSingleUsersEmailUniqueIndex1758049174211
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    -- Make all operations schema-aware and safe
+    // Make all operations schema-aware and safe
     await queryRunner.query(`DO $$
     BEGIN
       IF to_regclass(current_schema() || '.users') IS NOT NULL THEN

@@ -4,7 +4,7 @@ export class RenameUsersEmailUniqueIndex1729090000001
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    -- Make operations safe and schema-aware
+    // Make operations safe and schema-aware
     await queryRunner.query(`DO $$
     DECLARE users_reg regclass;
     BEGIN
