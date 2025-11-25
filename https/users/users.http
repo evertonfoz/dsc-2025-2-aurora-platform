@@ -14,6 +14,9 @@
 @token = {{loginUsers.response.body.$.accessToken}}
 @refreshToken = {{loginUsers.response.body.$.refreshToken}}
 
+# Service token for internal API calls (set to match your .env SERVICE_TOKEN)
+@serviceToken = Utfpr@2005
+
 ### Local helper: login (named `loginUsers`)
 # @name loginUsers
 POST {{apiBaseAuth}}/auth/login
@@ -39,6 +42,17 @@ Content-Type: application/json
 POST {{apiBaseUsers}}/users/validate
 Accept: application/json
 Content-Type: application/json
+
+{
+  "email": "test.user@example.com",
+  "password": "StrongP@ssw0rd"
+}
+
+### POST /users/validate with service token (for internal calls)
+POST {{apiBaseUsers}}/users/validate
+Accept: application/json
+Content-Type: application/json
+x-service-token: {{serviceToken}}
 
 {
   "email": "test.user@example.com",
