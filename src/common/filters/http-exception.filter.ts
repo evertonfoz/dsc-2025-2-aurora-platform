@@ -47,14 +47,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       // Handle exceptions with status property (like some Passport errors)
       status = (exception as { status: number }).status;
       message =
-        typeof (exception as { message?: string }).message === 'string' &&
-        (exception as { message?: string }).message
-          ? (exception as { message: string }).message
+        (typeof (exception as { message?: string }).message === 'string' &&
+        (exception as { message?: string }).message)
+          ? (exception as unknown as { message: string }).message
           : 'Error';
       error =
-        typeof (exception as { name?: string }).name === 'string' &&
-        (exception as { name?: string }).name
-          ? (exception as { name: string }).name
+        (typeof (exception as { name?: string }).name === 'string' &&
+        (exception as { name?: string }).name)
+          ? (exception as unknown as { name: string }).name
           : 'Error';
     }
 
