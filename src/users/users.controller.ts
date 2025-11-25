@@ -27,7 +27,7 @@ import {
 } from '@nestjs/swagger';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UseGuards } from '@nestjs/common';
-import { ServiceTokenGuard } from '@aurora/common';
+import { ServiceTokenGuard } from '../common/guards/service-token.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ApiBearerAuth } from '@nestjs/swagger';
@@ -68,7 +68,7 @@ export class UsersController {
   @ApiBadRequestResponse({ description: 'Payload ou ID inválido.' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(ServiceTokenGuard, JwtAuthGuard, RolesGuard)
   async patch(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
@@ -105,7 +105,7 @@ export class UsersController {
   @ApiBadRequestResponse({ description: 'Payload ou ID inválido.' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
   @Put(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(ServiceTokenGuard, JwtAuthGuard, RolesGuard)
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
@@ -169,7 +169,7 @@ export class UsersController {
     description: 'Sem permissão (se houver autorização).',
   })
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(ServiceTokenGuard, JwtAuthGuard, RolesGuard)
   @Roles('admin')
   async create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
     const user = await this.users.create(dto);
@@ -239,7 +239,7 @@ export class UsersController {
   @ApiUnauthorizedResponse({ description: 'Não autenticado (se aplicável).' })
   @ApiForbiddenResponse({ description: 'Sem permissão (se aplicável).' })
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(ServiceTokenGuard, JwtAuthGuard, RolesGuard)
   @Roles('teacher', 'admin')
   async findAll(
     @Query() query: PaginationQueryDto,
@@ -267,7 +267,7 @@ export class UsersController {
   @ApiBadRequestResponse({ description: 'ID inválido.' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
   @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(ServiceTokenGuard, JwtAuthGuard, RolesGuard)
   async findOne(
     @Param('id') id: string,
     @OwnerId() requesterId: number,
@@ -306,7 +306,7 @@ export class UsersController {
   @ApiBadRequestResponse({ description: 'ID inválido.' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado.' })
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(ServiceTokenGuard, JwtAuthGuard, RolesGuard)
   @Roles('admin')
   async remove(
     @Param('id') id: string,

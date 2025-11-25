@@ -1,13 +1,41 @@
 import './polyfill-crypto';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, HttpException, HttpStatus } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Global exception filter to properly handle auth errors
+  app.useGlobalFilters({
+    catch(exception: any, host: any) {
+      const ctx = host.switchToHttp();
+      const response = ctx.getResponse();
+      
+      let status = HttpStatus.INTERNAL_SERVER_ERROR;
+      let message = 'Internal server error';
+      
+      if (exception instanceof HttpException) {
+        status = exception.getStatus();
+        const exceptionResponse = exception.getResponse();
+        message = typeof exceptionResponse === 'object' && 'message' in exceptionResponse
+          ? (exceptionResponse as any).message
+          : exception.message;
+      } else if (exception?.status) {
+        status = exception.status;
+        message = exception.message || 'Error';
+      }
+
+      response.status(status).json({
+        statusCode: status,
+        message,
+        error: exception?.name || 'Error',
+      });
+    },
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),

@@ -8,14 +8,17 @@
 @apiBaseAuth = {{authHost}}
 @userId = 1
 
-# Capture tokens from the local `loginUsers` request (defined below) so this file
+
+# Capture tokens from the local `loginUsers` and `loginAdmin` requests (defined below) so this file
 # can be used standalone without running `auth.http`. If you prefer, you can still
 # run the `auth.http` login and adjust these vars to `{{login.response.body.$.accessToken}}`.
 @token = {{loginUsers.response.body.$.accessToken}}
 @refreshToken = {{loginUsers.response.body.$.refreshToken}}
+@adminToken = {{loginAdmin.response.body.$.accessToken}}
 
 # Service token for internal API calls (set to match your .env SERVICE_TOKEN)
 @serviceToken = Utfpr@2005
+
 
 ### Local helper: login (named `loginUsers`)
 # @name loginUsers
@@ -28,6 +31,18 @@ Content-Type: application/json
   "password": "StrongP@ssw0rd"
 }
 
+### Local helper: login admin (named `loginAdmin`)
+# @name loginAdmin
+POST {{apiBaseAuth}}/auth/login
+Accept: application/json
+Content-Type: application/json
+
+{
+  "email": "admin.user@example.com",
+  "password": "AdminP@ss1"
+}
+
+
 ### Local helper: logout (named `logoutUsers`)
 # @name logoutUsers
 POST {{apiBaseAuth}}/auth/logout
@@ -38,7 +53,32 @@ Content-Type: application/json
   "refreshToken": "{{refreshToken}}"
 }
 
-### POST /users/validate (used by Auth service)
+
+### Variante interna (service-token)
+# IMPORTANTE: Esta requisição testa o logout protegido para chamadas internas.
+# O endpoint só retorna 201 se o header x-service-token estiver presente e válido.
+# Sem o header, o esperado é erro 401 (Service token required).
+POST {{apiBaseAuth}}/auth/logout
+Accept: application/json
+Content-Type: application/json
+x-service-token: {{serviceToken}}
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+
+### Variante interna (service-token)
+POST {{apiBaseAuth}}/auth/logout
+Accept: application/json
+Content-Type: application/json
+x-service-token: {{serviceToken}}
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### POST /users/validate (public and internal)
 POST {{apiBaseUsers}}/users/validate
 Accept: application/json
 Content-Type: application/json
@@ -48,7 +88,8 @@ Content-Type: application/json
   "password": "StrongP@ssw0rd"
 }
 
-### POST /users/validate with service token (for internal calls)
+
+### Variante interna (service-token)
 POST {{apiBaseUsers}}/users/validate
 Accept: application/json
 Content-Type: application/json
@@ -59,17 +100,46 @@ x-service-token: {{serviceToken}}
   "password": "StrongP@ssw0rd"
 }
 
-### List users (REQUIRES teacher|admin)
+### List users (REQUIRES teacher|admin) - test user (esperado 401)
 GET {{apiBaseUsers}}/users?q=ana&role=teacher&isActive=true&page=1&limit=20
 Accept: application/json
 Authorization: Bearer {{token}}
 
-### Get user by id (REQUIRES self-or-admin)
+### List users (REQUIRES teacher|admin) - admin (esperado 401/403, mesmo admin precisa x-service-token)
+GET {{apiBaseUsers}}/users?q=ana&role=teacher&isActive=true&page=1&limit=20
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+### Variante interna (service-token)
+# IMPORTANTE: Mesmo autenticado como admin, este endpoint só retorna 200 se o header x-service-token estiver presente e válido.
+# Sem o header, o esperado é erro 401/403 (acesso restrito a chamadas internas de serviço).
+GET {{apiBaseUsers}}/users?q=ana&role=teacher&isActive=true&page=1&limit=20
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+x-service-token: {{serviceToken}}
+
+
+### Get user by id (REQUIRES self-or-admin) - test user
 GET {{apiBaseUsers}}/users/{{userId}}
 Accept: application/json
 Authorization: Bearer {{token}}
 
-### Create user (REQUIRES admin)
+### Get user by id (REQUIRES self-or-admin) - admin (esperado 401/403, mesmo admin precisa x-service-token)
+GET {{apiBaseUsers}}/users/{{userId}}
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+
+### Variante interna (service-token)
+# IMPORTANTE: Mesmo autenticado como admin, este endpoint só retorna 200 se o header x-service-token estiver presente e válido.
+# Sem o header, o esperado é erro 401/403 (acesso restrito a chamadas internas de serviço).
+GET {{apiBaseUsers}}/users/{{userId}}
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+x-service-token: {{serviceToken}}
+
+
+### Create user (REQUIRES admin) - test user (esperado 401)
 POST {{apiBaseUsers}}/users
 Accept: application/json
 Content-Type: application/json
@@ -80,11 +150,40 @@ Authorization: Bearer {{token}}
   "email": "test.user@example.com",
   "password": "StrongP@ssw0rd",
   "role": "teacher"
-  // NOTE: If your Users API expects roles as an array (recommended with JWT canônico), use instead:
-  // "roles": ["student"]
 }
 
-### Create student user (for testing)
+### Create user (REQUIRES admin) - admin (esperado 401/403, mesmo admin precisa x-service-token)
+POST {{apiBaseUsers}}/users
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "name": "Test User",
+  "email": "test.user@example.com",
+  "password": "StrongP@ssw0rd",
+  "role": "teacher"
+}
+
+
+### Variante interna (service-token)
+# IMPORTANTE: Mesmo autenticado como admin, este endpoint só retorna 200 se o header x-service-token estiver presente e válido.
+# Sem o header, o esperado é erro 401/403 (acesso restrito a chamadas internas de serviço).
+POST {{apiBaseUsers}}/users
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+x-service-token: {{serviceToken}}
+
+{
+  "name": "Test User",
+  "email": "test.user@example.com",
+  "password": "StrongP@ssw0rd",
+  "role": "teacher"
+}
+
+
+### Create student user (for testing) - test user (esperado 401)
 POST {{apiBaseUsers}}/users
 Accept: application/json
 Content-Type: application/json
@@ -95,12 +194,41 @@ Authorization: Bearer {{token}}
   "email": "student.user@example.com",
   "password": "StudentP@ss1",
   "role": "student"
-  // NOTE: If your Users API expects roles as an array, use:
-  // "roles": ["student"]
+}
+
+### Create student user (for testing) - admin (esperado 401/403, mesmo admin precisa x-service-token)
+POST {{apiBaseUsers}}/users
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "name": "Student User",
+  "email": "student.user@example.com",
+  "password": "StudentP@ss1",
+  "role": "student"
 }
 
 
-### Create admin user (for testing)
+### Variante interna (service-token)
+# IMPORTANTE: Mesmo autenticado como admin, este endpoint só retorna 200 se o header x-service-token estiver presente e válido.
+# Sem o header, o esperado é erro 401/403 (acesso restrito a chamadas internas de serviço).
+POST {{apiBaseUsers}}/users
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+x-service-token: {{serviceToken}}
+
+{
+  "name": "Student User",
+  "email": "student.user@example.com",
+  "password": "StudentP@ss1",
+  "role": "student"
+}
+
+
+
+### Create admin user (for testing) - test user (esperado 401)
 POST {{apiBaseUsers}}/users
 Accept: application/json
 Content-Type: application/json
@@ -111,12 +239,41 @@ Authorization: Bearer {{token}}
   "email": "admin.user@example.com",
   "password": "AdminP@ss1",
   "role": "admin"
-  // NOTE: If your Users API expects roles as an array, use:
-  // "roles": ["admin"]
+}
+
+### Create admin user (for testing) - admin (esperado 401/403, mesmo admin precisa x-service-token)
+POST {{apiBaseUsers}}/users
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "name": "Admin User",
+  "email": "admin.user@example.com",
+  "password": "AdminP@ss1",
+  "role": "admin"
 }
 
 
-### Update user (partial) (REQUIRES self-or-admin)
+### Variante interna (service-token)
+# IMPORTANTE: Mesmo autenticado como admin, este endpoint só retorna 200 se o header x-service-token estiver presente e válido.
+# Sem o header, o esperado é erro 401/403 (acesso restrito a chamadas internas de serviço).
+POST {{apiBaseUsers}}/users
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+x-service-token: {{serviceToken}}
+
+{
+  "name": "Admin User",
+  "email": "admin.user@example.com",
+  "password": "AdminP@ss1",
+  "role": "admin"
+}
+
+
+
+### Update user (partial) (REQUIRES self-or-admin) - test user
 PATCH {{apiBaseUsers}}/users/{{userId}}
 Accept: application/json
 Content-Type: application/json
@@ -127,7 +284,32 @@ Authorization: Bearer {{token}}
   // NOTE: When acting as "self", limit updatable fields (e.g., name). Admin may update broader fields per policy.
 }
 
-### Replace user (PUT) (REQUIRES self-or-admin)
+### Update user (partial) (REQUIRES self-or-admin) - admin (esperado 401/403, mesmo admin precisa x-service-token)
+PATCH {{apiBaseUsers}}/users/{{userId}}
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "name": "Updated Name"
+}
+
+
+### Variante interna (service-token)
+# IMPORTANTE: Mesmo autenticado como admin, este endpoint só retorna 200 se o header x-service-token estiver presente e válido.
+# Sem o header, o esperado é erro 401/403 (acesso restrito a chamadas internas de serviço).
+PATCH {{apiBaseUsers}}/users/{{userId}}
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+x-service-token: {{serviceToken}}
+
+{
+  "name": "Updated Name"
+}
+
+
+### Replace user (PUT) (REQUIRES self-or-admin) - test user
 PUT {{apiBaseUsers}}/users/{{userId}}
 Accept: application/json
 Content-Type: application/json
@@ -138,24 +320,67 @@ Authorization: Bearer {{token}}
   "email": "replaced.user@example.com",
   "password": "AnotherP@ss1",
   "role": "teacher"
-  // NOTE: If your schema uses roles array:
-  // "roles": ["student"]
 }
 
-### Delete user (REQUIRES admin)
+### Replace user (PUT) (REQUIRES self-or-admin) - admin (esperado 401/403, mesmo admin precisa x-service-token)
+PUT {{apiBaseUsers}}/users/{{userId}}
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "name": "Replaced Name",
+  "email": "replaced.user@example.com",
+  "password": "AnotherP@ss1",
+  "role": "teacher"
+}
+
+
+### Variante interna (service-token)
+# IMPORTANTE: Mesmo autenticado como admin, este endpoint só retorna 200 se o header x-service-token estiver presente e válido.
+# Sem o header, o esperado é erro 401/403 (acesso restrito a chamadas internas de serviço).
+PUT {{apiBaseUsers}}/users/{{userId}}
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+x-service-token: {{serviceToken}}
+
+{
+  "name": "Replaced Name",
+  "email": "replaced.user@example.com",
+  "password": "AnotherP@ss1",
+  "role": "teacher"
+}
+
+
+### Delete user (REQUIRES admin) - test user (esperado 401)
 DELETE {{apiBaseUsers}}/users/{{userId}}
 Accept: application/json
 Authorization: Bearer {{token}}
 
+### Delete user (REQUIRES admin) - admin (esperado 401/403, mesmo admin precisa x-service-token)
+DELETE {{apiBaseUsers}}/users/{{userId}}
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+
+### Variante interna (service-token)
+# IMPORTANTE: Mesmo autenticado como admin, este endpoint só retorna 200 se o header x-service-token estiver presente e válido.
+# Sem o header, o esperado é erro 401/403 (acesso restrito a chamadas internas de serviço).
+DELETE {{apiBaseUsers}}/users/{{userId}}
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+x-service-token: {{serviceToken}}
+
 # Notes
 # - Set `@token` to a valid JWT (or enable automatic capture from Auth). Protected routes return 401 without a token.
 # - Query params for `GET /users`: `q` (text search in name/email), `role`, `isActive` (true/false), `page`, `limit`.
-# - RBAC esperado:
-#   • GET /users → teacher|admin
-#   • GET /users/:id → self-or-admin (self = params.id === JWT.sub)
-#   • POST /users → admin
-#   • PATCH/PUT /users/:id → self-or-admin (service enforces field limits for self)
-#   • DELETE /users/:id → admin
+# - RBAC esperado: TODOS os endpoints protegidos requerem x-service-token, mesmo para admins (acesso restrito a chamadas internas de serviço).
+#   • GET /users → x-service-token
+#   • GET /users/:id → x-service-token
+#   • POST /users → x-service-token
+#   • PATCH/PUT /users/:id → x-service-token
+#   • DELETE /users/:id → x-service-token
 # - `POST /users/validate` is used by the Auth service to verify credentials and should return the user identity when successful.
 # - Adjust `@usersHost` and `@authHost` if your servers run on different ports or hosts.
 #   By default user endpoints use `{{apiBaseUsers}}` and auth endpoints use `{{apiBaseAuth}}`.

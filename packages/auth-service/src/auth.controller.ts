@@ -19,7 +19,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RefreshDto } from './dtos/refresh.dto';
 import { LogoutDto } from './dtos/logout.dto';
-import { RolesGuard, TokenRevocationGuard } from '@aurora/common';
+import { RolesGuard, ServiceTokenGuard, TokenRevocationGuard } from '@aurora/common';
 
 @Controller('auth')
 @ApiTags('Auth')
@@ -48,6 +48,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @UseGuards(ServiceTokenGuard)
   async logout(@Body() dto: LogoutDto) {
     return this.auth.logout(dto.refreshToken);
   }

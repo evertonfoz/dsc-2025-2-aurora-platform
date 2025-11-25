@@ -11,13 +11,13 @@ describe('JwtAuthGuard (dev behavior)', () => {
     } as unknown as ExecutionContext & { _req?: Record<string, unknown> };
   }
 
-  it('injects a fake user when NODE_ENV !== production', () => {
+  it('injects a fake user when NODE_ENV !== production', async () => {
     const prev = process.env.NODE_ENV;
     const prevAuto = process.env.DEV_AUTO_AUTH;
     process.env.NODE_ENV = 'test';
     process.env.DEV_AUTO_AUTH = 'true';
     const context = makeContext();
-    const ok = guard.canActivate(context as ExecutionContext);
+    const ok = await guard.canActivate(context as ExecutionContext);
     // guard returns true in dev/test
     expect(ok).toBe(true);
     const req = context.switchToHttp().getRequest();

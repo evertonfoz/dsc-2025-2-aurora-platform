@@ -8,4 +8,5 @@ export * from './guards/service-token.guard';
 export * from './guards/combined-auth.guard';
 export * from './guards/token-revocation.guard';
 export * from './strategies/jwt.strategy';
+export * from './filters/http-exception.filter';
 export * from './modules/common.module';

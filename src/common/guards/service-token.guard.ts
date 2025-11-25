@@ -25,6 +25,18 @@ export class ServiceTokenGuard implements CanActivate {
     if (String(token) !== String(expected)) {
       throw new UnauthorizedException('Service token required');
     }
+
+    // When service token is valid, inject a trusted internal service user
+    // so subsequent guards (JwtAuthGuard, RolesGuard) see an authenticated admin.
+    // This allows internal service-to-service calls to bypass individual JWT validation.
+    if (!req.user) {
+      req.user = {
+        sub: 0, // special ID for internal service
+        roles: ['admin', 'teacher', 'student'], // grant all roles for internal calls
+        isAdmin: true,
+      };
+    }
+
     return true;
   }
 }
