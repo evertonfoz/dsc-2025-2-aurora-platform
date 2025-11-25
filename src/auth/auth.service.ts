@@ -154,7 +154,7 @@ export class AuthService {
     // this moment are considered invalid by JwtStrategy.
     try {
       await this.usersService?.setLastLogoutAt(current.userId, nowUtc());
-    } catch (err) {
+    } catch {
       // Non-fatal: best-effort update. Do not break logout if this fails.
     }
 

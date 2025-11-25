@@ -10,7 +10,7 @@ import {
 export class ServiceTokenGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest();
-    const header = req.headers['x-service-token'] || req.headers['X-Service-Token'];
+    const header = req.headers['x-service-token'] ?? req.headers['X-Service-Token'];
     const token = Array.isArray(header) ? header[0] : header;
     const expected = process.env.SERVICE_TOKEN;
     // If server is configured with the insecure default token, refuse and ask

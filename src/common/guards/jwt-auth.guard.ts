@@ -23,7 +23,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') implements CanActivate {
       if (authHeader?.startsWith('Bearer ')) {
         try {
           return (await super.canActivate(context)) as boolean;
-        } catch (err) {
+        } catch {
           // Re-throw any authentication errors
           throw new UnauthorizedException('Invalid or missing authentication token');
         }
@@ -42,7 +42,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') implements CanActivate {
     // In production, always validate via Passport
     try {
       return (await super.canActivate(context)) as boolean;
-    } catch (err) {
+    } catch {
       throw new UnauthorizedException('Invalid or missing authentication token');
     }
   }

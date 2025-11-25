@@ -9,7 +9,7 @@ import { Response } from 'express';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
-  catch(exception: any, host: ArgumentsHost) {
+  catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     
@@ -20,21 +20,40 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      
-      if (typeof exceptionResponse === 'object' && 'message' in exceptionResponse) {
-        message = (exceptionResponse as any).message;
+      if (
+        typeof exceptionResponse === 'object' &&
+        exceptionResponse !== null &&
+        'message' in exceptionResponse &&
+        typeof (exceptionResponse as Record<string, unknown>).message === 'string'
+      ) {
+        message = (exceptionResponse as Record<string, unknown>).message as string;
       } else if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
-      } else {
+      } else if (
+        typeof exception.message === 'string' &&
+        exception.message.length > 0
+      ) {
         message = exception.message;
       }
-      
-      error = exception.name || 'HttpException';
-    } else if (exception?.status) {
+      error = exception.name ?? 'HttpException';
+    } else if (
+      typeof exception === 'object' &&
+      exception !== null &&
+      'status' in exception &&
+      typeof (exception as Record<string, unknown>).status === 'number'
+    ) {
       // Handle exceptions with status property (like some Passport errors)
-      status = exception.status;
-      message = exception.message || 'Error';
-      error = exception.name || 'Error';
+      status = (exception as { status: number }).status;
+      message =
+        (typeof (exception as { message?: string }).message === 'string' &&
+        (exception as { message?: string }).message)
+          ? (exception as { message: string }).message
+          : 'Error';
+      error =
+        (typeof (exception as { name?: string }).name === 'string' &&
+        (exception as { name?: string }).name)
+          ? (exception as { name: string }).name
+          : 'Error';
     }
 
     response.status(status).json({
