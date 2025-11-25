@@ -3,11 +3,20 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { config } from 'dotenv';
 import { UsersModule } from './users/users.module';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { CommonModule, JwtStrategy } from '@aurora/common';
 
 config();
 
 @Module({
   imports: [
+    CommonModule,
+    JwtModule.register({
+      secret: process.env.JWT_ACCESS_SECRET ?? 'dev_access_secret',
+      signOptions: { expiresIn: (process.env.JWT_EXPIRES_IN ?? '15m') as any },
+    }),
+    PassportModule.register({ defaultStrategy: 'jwt' }),
     TypeOrmModule.forRootAsync({
       useFactory: () => ({
         type: 'postgres',
@@ -25,5 +34,7 @@ config();
     }),
     UsersModule,
   ],
+  providers: [],
+  // Validate service tokens via guard - exported from common module.
 })
 export class AppModule {}

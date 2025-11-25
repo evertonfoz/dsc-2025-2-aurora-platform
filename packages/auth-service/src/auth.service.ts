@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, IsNull } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { RefreshToken } from './entities/refresh-token.entity';
-import * as argon2 from 'argon2';
+import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { UsersHttpClient, UsersIdentity } from './users-http.client';
 
@@ -43,7 +43,7 @@ export class AuthService {
     userAgent?: string,
   ): Promise<{ raw: string; entity: RefreshToken }> {
     const raw = crypto.randomBytes(48).toString('base64url');
-    const tokenHash = await argon2.hash(raw);
+    const tokenHash = await bcrypt.hash(raw, 10);
     const entity = this.refreshRepo.create({
       userId,
       tokenHash,
@@ -91,7 +91,7 @@ export class AuthService {
 
     let current: RefreshToken | undefined;
     for (const t of candidates) {
-      if (await argon2.verify(t.tokenHash, refreshTokenRaw)) {
+      if (await bcrypt.compare(refreshTokenRaw, t.tokenHash)) {
         current = t;
         break;
       }
@@ -128,7 +128,7 @@ export class AuthService {
 
     let current: RefreshToken | undefined;
     for (const t of candidates) {
-      if (await argon2.verify(t.tokenHash, refreshTokenRaw)) {
+      if (await bcrypt.compare(refreshTokenRaw, t.tokenHash)) {
         current = t;
         break;
       }
@@ -147,7 +147,9 @@ export class AuthService {
   }
 
   async me(userId: number) {
-    const user = await this.users.getById(userId);
+    // create an internal token to call the users service (it requires JWT)
+    const token = this.jwt.sign({ sub: userId, email: '', roles: [] });
+    const user = await this.users.getById(userId, token);
     if (!user) throw new UnauthorizedException('User not found');
     return {
       id: user.id,

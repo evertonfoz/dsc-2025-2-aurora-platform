@@ -17,7 +17,7 @@ export class User {
   name!: string;
 
   @Index('idx_users_email_unique', ['email'], { unique: true })
-  @Column({ type: 'varchar', length: 160 })
+  @Column({ type: 'citext' })
   email!: string;
 
   @Column({ name: 'password_hash', type: 'varchar', length: 255 })

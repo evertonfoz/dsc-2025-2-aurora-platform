@@ -1,18 +1,29 @@
-import { IsEmail, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString, Length } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import { IsTrimmed, IsStrongPassword } from '@aurora/common';
+import { ToLower } from '@aurora/common';
+import { UserRole } from '../enums/user-role.enum';
 
 export class CreateUserDto {
-  @ApiProperty({ example: 'user@example.com' })
+  @ApiProperty({ minLength: 2, maxLength: 120 })
+  @IsString()
+  @IsTrimmed()
+  @Length(2, 120)
+  name!: string;
+
+  @ApiProperty({ format: 'email' })
+  @Transform(ToLower())
   @IsEmail()
-  email: string;
+  email!: string;
 
-  @ApiPropertyOptional({ example: 'John Doe' })
-  @IsOptional()
+  @ApiProperty({ minLength: 6 })
   @IsString()
-  name?: string;
+  @IsStrongPassword()
+  password!: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ enum: UserRole, enumName: 'UserRole' })
   @IsOptional()
-  @IsString()
-  password?: string;
+  @IsEnum(UserRole, { message: 'role deve ser student | teacher | admin' })
+  role?: UserRole;
 }

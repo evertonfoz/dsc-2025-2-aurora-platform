@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
+import jwt from 'jsonwebtoken';
 
 export interface UsersIdentity {
   id: number;
@@ -35,8 +36,14 @@ export class UsersHttpClient {
 
   async getById(userId: number): Promise<UsersIdentity | null> {
     try {
+      // create a short-lived service token signed with SERVICE_TOKEN_SECRET
+      const secret = process.env.SERVICE_TOKEN_SECRET ?? 'dev_service_secret';
+      const raw = jwt.sign({ service: true, iss: 'auth-service' }, secret, { expiresIn: '60s' });
+      const headers: Record<string, string> = { Authorization: `Bearer ${raw}` };
+
       const res = await axios.get<UsersIdentity | { data: UsersIdentity }>(
         `${this.baseUrl}/users/${userId}`,
+        { headers },
       );
       const data = res.data as UsersIdentity | { data: UsersIdentity };
       const payload: UsersIdentity | undefined = 'data' in data ? data.data : data;
@@ -48,7 +55,16 @@ export class UsersHttpClient {
 
   async setLastLogoutAt(userId: number, date?: Date): Promise<boolean> {
     try {
-      const res = await axios.patch(`${this.baseUrl}/users/${userId}/last-logout`, { lastLogoutAt: date?.toISOString() ?? new Date().toISOString() });
+      // create a short-lived service token signed with SERVICE_TOKEN_SECRET
+      const secret = process.env.SERVICE_TOKEN_SECRET ?? 'dev_service_secret';
+      const raw = jwt.sign({ service: true, iss: 'auth-service' }, secret, { expiresIn: '60s' });
+      const headers: Record<string, string> = { Authorization: `Bearer ${raw}` };
+
+      const res = await axios.patch(
+        `${this.baseUrl}/users/${userId}/last-logout`,
+        { lastLogoutAt: date?.toISOString() ?? new Date().toISOString() },
+        { headers },
+      );
       return res.status >= 200 && res.status < 300;
     } catch (err) {
       return false;

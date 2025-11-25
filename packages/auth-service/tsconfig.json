@@ -10,7 +10,12 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@aurora/common": ["../common/dist"],
+      "@aurora/common/*": ["../common/dist/*"]
+    }
   },
   "include": ["src/**/*", "test/**/*"]
 }

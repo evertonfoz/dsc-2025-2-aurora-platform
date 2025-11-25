@@ -14,12 +14,12 @@ import {
 import { Request } from 'express';
 import { LoginDto } from './dtos/login.dto';
 import { JwtService } from '@nestjs/jwt';
-import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RefreshDto } from './dtos/refresh.dto';
 import { LogoutDto } from './dtos/logout.dto';
-import { RolesGuard } from './common/guards/roles.guard';
+import { RolesGuard, TokenRevocationGuard } from '@aurora/common';
 
 @Controller('auth')
 @ApiTags('Auth')
@@ -53,36 +53,14 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  async me(@Headers('authorization') authz?: string) {
-    if (!authz?.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Missing bearer token');
-    }
-    const token = authz.slice('Bearer '.length);
-
-    let payload: unknown;
-    try {
-      payload = this.jwt.verify(token, {
-        secret: process.env.JWT_ACCESS_SECRET ?? 'dev_access_secret',
-      });
-    } catch {
-      throw new UnauthorizedException('Invalid token');
-    }
-
-    if (typeof payload !== 'object' || payload === null || !('sub' in payload)) {
+  @UseGuards(AuthGuard('jwt'), TokenRevocationGuard, RolesGuard)
+  async me(@Req() req: Request) {
+    // Passport JwtStrategy will populate request.user with the token payload
+    const user = req.user as { sub?: number } | undefined;
+    const userId = Number(user?.sub);
+    if (!user || Number.isNaN(userId) || userId <= 0) {
       throw new UnauthorizedException('Invalid token payload');
     }
-
-    const sub = (payload as { sub?: unknown }).sub;
-    if (typeof sub !== 'string' && typeof sub !== 'number') {
-      throw new UnauthorizedException('Invalid token payload');
-    }
-
-    const userId = Number(sub);
-    if (Number.isNaN(userId) || userId <= 0) {
-      throw new UnauthorizedException('Invalid token payload');
-    }
-
     return this.auth.me(userId);
   }
 }

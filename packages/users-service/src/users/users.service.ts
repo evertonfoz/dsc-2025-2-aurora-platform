@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike } from 'typeorm';
-import * as argon2 from 'argon2';
+import * as bcrypt from 'bcryptjs';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UserDto } from './dto/user.dto';
 import { User } from './entities/user.entity';
@@ -30,21 +30,23 @@ export class UsersService implements OnModuleInit {
 
     const existingAdmin = await this.repo.findOne({ where: { email: ILike(adminEmail) } as any });
     if (!existingAdmin) {
-      const passwordHash = await argon2.hash('AdminP@ss1');
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash('AdminP@ss1', salt);
       const admin = this.repo.create({ name: 'Admin User', email: adminEmail, passwordHash } as any);
       await this.repo.save(admin);
     }
 
     const existingTest = await this.repo.findOne({ where: { email: ILike(testEmail) } as any });
     if (!existingTest) {
-      const passwordHash = await argon2.hash('StrongP@ssw0rd');
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash('StrongP@ssw0rd', salt);
       const testUser = this.repo.create({ name: 'Test User', email: testEmail, passwordHash } as any);
       await this.repo.save(testUser);
     }
   }
 
   async create(createUserDto: CreateUserDto): Promise<UserDto> {
-    const passwordHash = createUserDto.password ? await argon2.hash(createUserDto.password) : '';
+    const passwordHash = createUserDto.password ? await (async () => { const s = await bcrypt.genSalt(10); return bcrypt.hash(createUserDto.password + (process.env.HASH_PEPPER ?? ''), s); })() : '';
     const user = this.repo.create({
       name: createUserDto.name ?? createUserDto.email,
       email: createUserDto.email,
@@ -54,7 +56,7 @@ export class UsersService implements OnModuleInit {
     return this.toDto(saved);
   }
 
-  async findOne(id: string): Promise<UserDto> {
+  async findOne(id: string, _ctx?: { id?: number; isAdmin?: boolean }): Promise<UserDto> {
     const asNumber = Number(id);
     const user = await this.repo.findOne({ where: { id: asNumber } as any });
     if (!user) throw new NotFoundException(`User with id ${id} not found`);
@@ -65,7 +67,8 @@ export class UsersService implements OnModuleInit {
     const user = await this.repo.findOne({ where: { email: ILike(email) } as any });
     if (!user) return null;
     try {
-      if (await argon2.verify(user.passwordHash, password)) return this.toDto(user);
+      const pepper = process.env.HASH_PEPPER ?? '';
+      if (await bcrypt.compare(password + pepper, user.passwordHash)) return this.toDto(user);
     } catch (e) {
       return null;
     }
@@ -97,13 +100,14 @@ export class UsersService implements OnModuleInit {
   }
 
   // New: update
-  async update(id: string, dto: Partial<CreateUserDto> & any): Promise<UserDto> {
+  async update(id: string, dto: Partial<CreateUserDto> & any, _ctx?: { id?: number; isAdmin?: boolean }): Promise<UserDto> {
     const asNumber = Number(id);
     const user = await this.repo.findOne({ where: { id: asNumber } as any });
     if (!user) throw new NotFoundException(`User with id ${id} not found`);
     if (dto.password) {
-      const passwordHash = await argon2.hash(dto.password);
-      user.passwordHash = passwordHash;
+      const pepper = process.env.HASH_PEPPER ?? '';
+      const salt = await bcrypt.genSalt(10);
+      user.passwordHash = await bcrypt.hash(dto.password + pepper, salt);
     }
     if (dto.email) user.email = dto.email;
     if (dto.name) user.name = dto.name;

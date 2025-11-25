@@ -12,6 +12,7 @@
 		"start:pm2": "pm2 start --name events-service --interpreter 'npx' -- src/main.ts -- -P tsconfig.nest.json"
 	},
 	"dependencies": {
+		"@aurora/common": "file:../common",
 		"@nestjs/common": "^11.1.9",
 		"@nestjs/core": "^11.1.9",
 		"@nestjs/platform-express": "^11.1.9",
