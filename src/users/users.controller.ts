@@ -31,7 +31,6 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { ValidateUserDto } from './dto/validate-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
-import { UserRole } from './enums/user-role.enum';
 import { PaginatedUsersResponseDto } from './dto/paginated-users-response.dto';
 
 @ApiTags('Users')
