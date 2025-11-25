@@ -147,9 +147,7 @@ export class AuthService {
   }
 
   async me(userId: number) {
-    // create an internal token to call the users service (it requires JWT)
-    const token = this.jwt.sign({ sub: userId, email: '', roles: [] });
-    const user = await this.users.getById(userId, token);
+    const user = await this.users.getById(userId);
     if (!user) throw new UnauthorizedException('User not found');
     return {
       id: user.id,
