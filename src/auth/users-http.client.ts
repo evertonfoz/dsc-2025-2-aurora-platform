@@ -24,6 +24,9 @@ export class UsersHttpClient {
           email,
           password,
         },
+        {
+          headers: { 'x-service-token': process.env.SERVICE_TOKEN ?? '' },
+        },
       );
       // Accept both plain UsersIdentity or wrapped { data: UsersIdentity }
       const data = res.data as UsersIdentity | { data: UsersIdentity };
@@ -39,6 +42,7 @@ export class UsersHttpClient {
     try {
       const res = await axios.get<UsersIdentity | { data: UsersIdentity }>(
         `${this.baseUrl}/users/${userId}`,
+        { headers: { 'x-service-token': process.env.SERVICE_TOKEN ?? '' } },
       );
       const data = res.data as UsersIdentity | { data: UsersIdentity };
       const payload: UsersIdentity | undefined =

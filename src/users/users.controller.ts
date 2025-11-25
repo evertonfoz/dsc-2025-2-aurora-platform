@@ -26,6 +26,8 @@ import {
   ApiNotFoundResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../common/decorators/roles.decorator';
+import { UseGuards } from '@nestjs/common';
+import { ServiceTokenGuard } from '../common/guards/service-token.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ApiBearerAuth } from '@nestjs/swagger';
@@ -177,6 +179,7 @@ export class UsersController {
   }
 
   @Post('validate')
+  @UseGuards(ServiceTokenGuard)
   async validate(@Body() dto: ValidateUserDto) {
     const identity = await this.users.validateCredentials(
       dto.email,
