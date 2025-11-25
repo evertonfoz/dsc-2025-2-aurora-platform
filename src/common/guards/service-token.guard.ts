@@ -12,8 +12,7 @@ export class ServiceTokenGuard implements CanActivate {
       headers: Record<string, string | string[] | undefined>;
       user?: { sub: number; roles: string[]; isAdmin: boolean };
     }>();
-    let header = req.headers['x-service-token'];
-    header ??= req.headers['X-Service-Token'];
+    const header = req.headers['x-service-token'] ?? req.headers['X-Service-Token'];
     const token = Array.isArray(header) ? header[0] : header;
     const expected = process.env.SERVICE_TOKEN;
     const insecureDefault = 'change-me-to-a-strong-secret';
