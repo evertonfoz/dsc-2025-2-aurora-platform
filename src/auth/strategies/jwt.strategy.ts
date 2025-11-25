@@ -1,5 +1,5 @@
 // src/auth/strategies/jwt.strategy.ts
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, Optional, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -17,7 +17,10 @@ export type AccessTokenPayload = AuthUser & {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(@Optional() private readonly config?: ConfigService) {
+  constructor(
+    @Optional() private readonly config?: ConfigService,
+    @Optional() private readonly usersService?: import('../../users/users.service').UsersService,
+  ) {
     // Resolve secret explicitly so we can throw in production when missing.
     const resolvedSecret =
       config?.get<string>('JWT_ACCESS_SECRET') ?? process.env.JWT_ACCESS_SECRET;
@@ -45,7 +48,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
    * É chamado automaticamente se a assinatura e a expiração forem válidas.
    * O valor retornado aqui vira `request.user` nos controllers/guards.
    */
-  validate(payload: AccessTokenPayload): AuthUser {
+  async validate(payload: AccessTokenPayload): Promise<AuthUser> {
     // Sanitiza e garante o shape canônico
     const { sub, email, roles } = payload;
 
@@ -53,6 +56,26 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (typeof sub !== 'number') {
       // Você pode lançar um UnauthorizedException aqui se desejar
       // mas, em geral, o token não deveria chegar até aqui errado.
+    }
+
+    // Check last logout: if user has lastLogoutAt and token issued before that,
+    // consider the token revoked.
+    try {
+      if (this.usersService) {
+        const userEntity = await this.usersService.getEntityById(sub);
+        const last = userEntity?.lastLogoutAt;
+        if (last) {
+          const tokenIat = Number(payload.iat) || 0; // seconds
+          const lastSecs = Math.floor(last.getTime() / 1000);
+          if (tokenIat < lastSecs) {
+            throw new UnauthorizedException('Token revoked by logout');
+          }
+        }
+      }
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      // If user not found or other DB error, fail authentication.
+      throw new UnauthorizedException('Invalid token');
     }
 
     return { sub, email, roles: Array.isArray(roles) ? roles : [] };

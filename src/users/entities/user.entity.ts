@@ -37,6 +37,8 @@ export class User {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
+  @Column({ name: 'last_logout_at', type: 'timestamptz', nullable: true })
+  lastLogoutAt?: Date | null;
 }
 
 export { UserRole };
