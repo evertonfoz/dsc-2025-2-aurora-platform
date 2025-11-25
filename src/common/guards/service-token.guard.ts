@@ -23,11 +23,13 @@ export class ServiceTokenGuard implements CanActivate {
     if (String(token) !== String(expected)) {
       throw new UnauthorizedException('Service token required');
     }
-    req.user ??= {
-      sub: 0,
-      roles: ['admin', 'teacher', 'student'],
-      isAdmin: true,
-    };
+    if (!req.user) {
+      req.user = {
+        sub: 0,
+        roles: ['admin', 'teacher', 'student'],
+        isAdmin: true,
+      };
+    }
     return true;
   }
 }
