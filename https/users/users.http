@@ -1,25 +1,62 @@
 ### Environment variables
 # Define these variables at the top so your HTTP client (VSCode REST Client, Thunder Client, etc.) can resolve them.
-@host = http://localhost:3001
-@apiBase = {{host}}/v1
+@usersHost = http://localhost:3011
+@authHost = http://localhost:3010
+
+# Base URLs
+@apiBaseUsers = {{usersHost}}
+@apiBaseAuth = {{authHost}}
 @userId = 1
-@token = 
-@refreshToken = 
 
+# Capture tokens from the local `loginUsers` request (defined below) so this file
+# can be used standalone without running `auth.http`. If you prefer, you can still
+# run the `auth.http` login and adjust these vars to `{{login.response.body.$.accessToken}}`.
+@token = {{loginUsers.response.body.$.accessToken}}
+@refreshToken = {{loginUsers.response.body.$.refreshToken}}
 
+### Local helper: login (named `loginUsers`)
+# @name loginUsers
+POST {{apiBaseAuth}}/auth/login
+Accept: application/json
+Content-Type: application/json
+
+{
+  "email": "test.user@example.com",
+  "password": "StrongP@ssw0rd"
+}
+
+### Local helper: logout (named `logoutUsers`)
+# @name logoutUsers
+POST {{apiBaseAuth}}/auth/logout
+Accept: application/json
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### POST /users/validate (used by Auth service)
+POST {{apiBaseUsers}}/users/validate
+Accept: application/json
+Content-Type: application/json
+
+{
+  "email": "test.user@example.com",
+  "password": "StrongP@ssw0rd"
+}
 
 ### List users (REQUIRES teacher|admin)
-GET {{apiBase}}/users
+GET {{apiBaseUsers}}/users?q=ana&role=teacher&isActive=true&page=1&limit=20
 Accept: application/json
 Authorization: Bearer {{token}}
 
 ### Get user by id (REQUIRES self-or-admin)
-GET {{apiBase}}/users/{{userId}}
+GET {{apiBaseUsers}}/users/{{userId}}
 Accept: application/json
 Authorization: Bearer {{token}}
 
 ### Create user (REQUIRES admin)
-POST {{apiBase}}/users
+POST {{apiBaseUsers}}/users
 Accept: application/json
 Content-Type: application/json
 Authorization: Bearer {{token}}
@@ -34,7 +71,7 @@ Authorization: Bearer {{token}}
 }
 
 ### Create student user (for testing)
-POST {{apiBase}}/users
+POST {{apiBaseUsers}}/users
 Accept: application/json
 Content-Type: application/json
 Authorization: Bearer {{token}}
@@ -50,7 +87,7 @@ Authorization: Bearer {{token}}
 
 
 ### Create admin user (for testing)
-POST {{apiBase}}/users
+POST {{apiBaseUsers}}/users
 Accept: application/json
 Content-Type: application/json
 Authorization: Bearer {{token}}
@@ -66,7 +103,7 @@ Authorization: Bearer {{token}}
 
 
 ### Update user (partial) (REQUIRES self-or-admin)
-PATCH {{apiBase}}/users/{{userId}}
+PATCH {{apiBaseUsers}}/users/{{userId}}
 Accept: application/json
 Content-Type: application/json
 Authorization: Bearer {{token}}
@@ -77,7 +114,7 @@ Authorization: Bearer {{token}}
 }
 
 ### Replace user (PUT) (REQUIRES self-or-admin)
-PUT {{apiBase}}/users/{{userId}}
+PUT {{apiBaseUsers}}/users/{{userId}}
 Accept: application/json
 Content-Type: application/json
 Authorization: Bearer {{token}}
@@ -86,23 +123,25 @@ Authorization: Bearer {{token}}
   "name": "Replaced Name",
   "email": "replaced.user@example.com",
   "password": "AnotherP@ss1",
-  "role": "USER"
+  "role": "teacher"
   // NOTE: If your schema uses roles array:
   // "roles": ["student"]
 }
 
 ### Delete user (REQUIRES admin)
-DELETE {{apiBase}}/users/{{userId}}
+DELETE {{apiBaseUsers}}/users/{{userId}}
 Accept: application/json
 Authorization: Bearer {{token}}
 
 # Notes
-# - Set `@token` to a valid JWT or leave empty for unsecured local testing (will return 401 on protected routes).
+# - Set `@token` to a valid JWT (or enable automatic capture from Auth). Protected routes return 401 without a token.
+# - Query params for `GET /users`: `q` (text search in name/email), `role`, `isActive` (true/false), `page`, `limit`.
 # - RBAC esperado:
 #   • GET /users → teacher|admin
 #   • GET /users/:id → self-or-admin (self = params.id === JWT.sub)
 #   • POST /users → admin
-#   • PATCH/PUT /users/:id → self-or-admin (service should enforce field limits for self)
+#   • PATCH/PUT /users/:id → self-or-admin (service enforces field limits for self)
 #   • DELETE /users/:id → admin
-# - Adjust `@host` if your server runs on a different port or host.
-# - By default requests now target `{{apiBase}}` which is `{{host}}/v1`.
+# - `POST /users/validate` is used by the Auth service to verify credentials and should return the user identity when successful.
+# - Adjust `@usersHost` and `@authHost` if your servers run on different ports or hosts.
+#   By default user endpoints use `{{apiBaseUsers}}` and auth endpoints use `{{apiBaseAuth}}`.
