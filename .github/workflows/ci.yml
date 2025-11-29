@@ -240,11 +240,32 @@ jobs:
         with:
           name: migration-log
           path: migration.log
-      - name: Run smoke tests
+      - name: Run smoke tests (root or packages)
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           DB_USER: postgres
           DB_PASS: postgres
           DB_NAME: aurora_users
-        run: npm run test -- test/smoke --runInBand
+        run: |
+          # If repo root has test/smoke, run it
+          if [ -d "test/smoke" ]; then
+            echo "Running root smoke tests..."
+            npm run test -- test/smoke --runInBand
+            exit $?
+          fi
+
+          # Otherwise look for packages with test/smoke and run them per-package
+          found=0
+          for pkg in packages/*; do
+            if [ -d "$pkg/test/smoke" ]; then
+              echo "Running smoke tests for package: $pkg"
+              # Use npm --prefix to run test in the package directory
+              npm --prefix "$pkg" run test -- test/smoke --runInBand || exit 1
+              found=1
+            fi
+          done
+
+          if [ "$found" -eq 0 ]; then
+            echo "No smoke tests found in root or packages. Skipping."
+          fi

@@ -6,6 +6,7 @@
 	"types": "dist/main.d.ts",
 	"scripts": {
 		"dev": "npx ts-node -P tsconfig.nest.json src/main.ts",
+		"test": "jest --runInBand",
 		"build": "tsc -p tsconfig.json",
 		"start": "node dist/main.js",
 		"start:dev": "npx ts-node -P tsconfig.nest.json src/main.ts",
@@ -21,6 +22,7 @@
 		"class-transformer": "^0.5.1",
 		"class-validator": "^0.14.2",
 		"cors": "^2.8.5",
+		"dedent": "^1.7.0",
 		"express": "^4.21.2",
 		"express-openapi-validator": "^5.6.0",
 		"express-validator": "^7.3.0",
@@ -28,6 +30,7 @@
 		"reflect-metadata": "^0.2.2",
 		"rxjs": "^7.8.2",
 		"typeorm": "^0.3.27",
+		"uid": "^2.0.2",
 		"uuid": "^9.0.0"
 	},
 	"devDependencies": {
@@ -39,12 +42,12 @@
 		"@types/node": "^20.19.25",
 		"@types/uuid": "^9.0.2",
 		"jest": "^30.2.0",
+		"pm2": "^5.2.0",
 		"ts-jest": "^29.4.5",
 		"ts-node": "^10.9.2",
 		"ts-node-dev": "^2.0.0",
 		"typescript": "^5.9.3",
-		"yaml": "^2.8.1",
-		"pm2": "^5.2.0"
+		"yaml": "^2.8.1"
 	},
 	"description": "Events service scaffold (Express + TypeScript).",
 	"keywords": [],

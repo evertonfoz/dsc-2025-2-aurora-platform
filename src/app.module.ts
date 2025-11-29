@@ -7,7 +7,6 @@ import { AppDataSource } from './database/data-source';
 // import { UsersModule } from './users/users.module';
 import { APP_PIPE, APP_FILTER } from '@nestjs/core';
 import { UsersModule } from './users/users.module';
-import { EventsModule } from './events/events.module';
 import { AuthModule } from './auth/auth.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -16,7 +15,6 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot(AppDataSource.options),
     UsersModule,
-    EventsModule,
     AuthModule,
     // UsersModule
   ],
