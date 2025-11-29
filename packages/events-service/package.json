@@ -6,6 +6,7 @@
 	"types": "dist/main.d.ts",
 	"scripts": {
 		"dev": "npx ts-node -P tsconfig.nest.json src/main.ts",
+		"test": "jest --runInBand",
 		"build": "tsc -p tsconfig.json",
 		"start": "node dist/main.js",
 		"start:dev": "npx ts-node -P tsconfig.nest.json src/main.ts",
