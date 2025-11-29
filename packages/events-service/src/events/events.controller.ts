@@ -1,65 +1,135 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
-import { ApiTags, ApiResponse, ApiOperation } from '@nestjs/swagger';
+import {
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Param,
+  Query,
+  Body,
+  ParseIntPipe,
+  UseGuards,
+  Logger,
+  Req,
+} from '@nestjs/common';
 import { EventsService } from './events.service';
-import { CreateEventDto, EventResponseDto } from './dto';
+import { CreateEventDto } from './dto/create-event.dto';
+import { UpdateEventDto } from './dto/update-event.dto';
+import { OwnerId, RolesGuard, Roles, CombinedAuthGuard } from '@aurora/common';
+import type { Request } from 'express';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
-@ApiTags('events')
 @Controller('events')
+@ApiBearerAuth()
 export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
+  private readonly logger = new Logger(EventsController.name);
+
   @Post()
-  @ApiOperation({ summary: 'Create event' })
-  @ApiResponse({ status: 201, description: 'Event created', type: EventResponseDto })
-  async create(@Body() createEventDto: CreateEventDto): Promise<EventResponseDto> {
-    // TODO: replace placeholder ownerUserId with authenticated user id
-    const created = await this.eventsService.create(createEventDto, 1);
-    // map to response DTO (normalize Date -> ISO strings)
-    return {
-      id: typeof created.id === 'number' ? created.id : Number(created.id) || 0,
-      slug: (created as any).slug || '',
-      title: created.title,
-      summary: (created as any).summary || '',
-      description: created.description,
-      state: (created as any).state || 'draft',
-      visibility: (created as any).visibility || 'public',
-  startsAt: (created as any).startsAt?.toISOString?.() || (created as any).startsAt || new Date().toISOString(),
-      endsAt: (created as any).endsAt?.toISOString?.() || new Date().toISOString(),
-      registrationOpensAt: (created as any).registrationOpensAt?.toISOString?.(),
-      registrationClosesAt: (created as any).registrationClosesAt?.toISOString?.(),
-      capacity: (created as any).capacity,
-      bannerUrl: (created as any).bannerUrl,
-      coverUrl: (created as any).coverUrl,
-      ownerUserId: (created as any).ownerUserId || 0,
-      createdAt: (created as any).createdAt?.toISOString?.() || new Date().toISOString(),
-      updatedAt: (created as any).updatedAt?.toISOString?.() || new Date().toISOString(),
-    } as EventResponseDto;
+  @UseGuards(CombinedAuthGuard, RolesGuard)
+  @Roles('teacher', 'admin')
+  create(
+    @Body() createEventDto: CreateEventDto,
+    @OwnerId() ownerUserId: number,
+  ) {
+    try {
+      this.logger.log(
+        `create called by owner=${ownerUserId} title=${createEventDto.title}`,
+      );
+    } catch {
+      /* ignore logging errors */
+    }
+    return this.eventsService.create(createEventDto, ownerUserId);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get event by id' })
-  @ApiResponse({ status: 200, description: 'Event found', type: EventResponseDto })
-  @ApiResponse({ status: 404, description: 'Event not found' })
-  async findOne(@Param('id') id: string): Promise<EventResponseDto> {
-    const found = await this.eventsService.findOne(id);
-    return {
-      id: typeof found.id === 'number' ? found.id : Number(found.id) || 0,
-      slug: (found as any).slug || '',
-      title: found.title,
-      summary: (found as any).summary || '',
-      description: found.description,
-      state: (found as any).state || 'draft',
-      visibility: (found as any).visibility || 'public',
-  startsAt: (found as any).startsAt?.toISOString?.() || (found as any).startsAt || new Date().toISOString(),
-      endsAt: (found as any).endsAt?.toISOString?.() || new Date().toISOString(),
-      registrationOpensAt: (found as any).registrationOpensAt?.toISOString?.(),
-      registrationClosesAt: (found as any).registrationClosesAt?.toISOString?.(),
-      capacity: (found as any).capacity,
-      bannerUrl: (found as any).bannerUrl,
-      coverUrl: (found as any).coverUrl,
-      ownerUserId: (found as any).ownerUserId || 0,
-      createdAt: (found as any).createdAt?.toISOString?.() || new Date().toISOString(),
-      updatedAt: (found as any).updatedAt?.toISOString?.() || new Date().toISOString(),
-    } as EventResponseDto;
+  @Get()
+  @UseGuards(CombinedAuthGuard, RolesGuard)
+  findAll(
+    @Query('q') q?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('visibility') visibility?: string,
+    @Query('state') state?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const payload = {
+      q,
+      from,
+      to,
+      visibility,
+      state,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+    };
+    try {
+      this.logger.log(`findAll called with ${JSON.stringify(payload)}`);
+    } catch {
+      /* ignore */
+    }
+    return this.eventsService.findAll(payload);
+  }
+
+  @Get(':idOrSlug')
+  @UseGuards(CombinedAuthGuard, RolesGuard)
+  findOne(@Param('idOrSlug') idOrSlug: string) {
+    try {
+      this.logger.log(`findOne called with idOrSlug=${idOrSlug}`);
+    } catch {
+      /* ignore */
+    }
+    const id = parseInt(idOrSlug, 10);
+    if (!isNaN(id)) {
+      return this.eventsService.findOneByIdOrSlug(id);
+    }
+    return this.eventsService.findOneByIdOrSlug(idOrSlug);
+  }
+
+  @Patch(':id')
+  @UseGuards(CombinedAuthGuard, RolesGuard)
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateEventDto: UpdateEventDto,
+    @OwnerId() ownerUserId: number,
+    @Req() req?: Request,
+  ) {
+    try {
+      this.logger.log(`update called id=${id} by owner=${ownerUserId}`);
+    } catch {
+      /* ignore */
+    }
+    interface JwtUser {
+      id?: number;
+      roles?: string[];
+    }
+    const user = req?.user as unknown as JwtUser | undefined;
+    const roles = user?.roles;
+    const isAdmin = Array.isArray(roles) && roles.includes('admin');
+    return this.eventsService.update(id, updateEventDto, {
+      id: ownerUserId,
+      isAdmin,
+    });
+  }
+
+  @Post(':id/publish')
+  @UseGuards(CombinedAuthGuard, RolesGuard)
+  publish(
+    @Param('id', ParseIntPipe) id: number,
+    @OwnerId() ownerUserId: number,
+    @Req() req?: Request,
+  ) {
+    try {
+      this.logger.log(`publish called id=${id} by owner=${ownerUserId}`);
+    } catch {
+      /* ignore */
+    }
+    interface JwtUser {
+      id?: number;
+      roles?: string[];
+    }
+    const user = req?.user as unknown as JwtUser | undefined;
+    const roles = user?.roles;
+    const isAdmin = Array.isArray(roles) && roles.includes('admin');
+    return this.eventsService.publish(id, { id: ownerUserId, isAdmin });
   }
 }

@@ -1,23 +1,39 @@
 import {
   Injectable,
   NotFoundException,
+  ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CreateEventDto } from './dto/create-event.dto';
 import { Event } from './entities/event.entity';
 import { EventState } from './enums/event-state.enum';
 import { EventVisibility } from './enums/event-visibility.enum';
+import { CreateEventDto } from './dto/create-event.dto';
+import { UpdateEventDto } from './dto/update-event.dto';
+import { toSlug } from './utils/slug.util';
 
 @Injectable()
 export class EventsService {
   constructor(
     @InjectRepository(Event)
-    private readonly repository: Repository<Event>,
+    private readonly eventRepository: Repository<Event>,
   ) {}
 
-  async create(createEventDto: CreateEventDto, ownerUserId: number): Promise<Event> {
+  private readonly logger = new Logger(EventsService.name);
+
+  async create(
+    createEventDto: CreateEventDto,
+    ownerUserId: number,
+  ): Promise<Event> {
+    try {
+      this.logger.log(
+        `create called owner=${ownerUserId} title=${createEventDto.title}`,
+      );
+    } catch {
+      /* ignore */
+    }
     // Validate dates
     const startsAt = new Date(createEventDto.startsAt);
     const endsAt = new Date(createEventDto.endsAt);
@@ -38,10 +54,10 @@ export class EventsService {
     }
 
     // Generate slug
-    let slug = createEventDto.slug ?? this.toSlug(createEventDto.title);
+    let slug = createEventDto.slug ?? toSlug(createEventDto.title);
     slug = await this.ensureUniqueSlug(slug);
 
-    const event = this.repository.create({
+    const event = this.eventRepository.create({
       ...createEventDto,
       startsAt,
       endsAt,
@@ -55,42 +71,208 @@ export class EventsService {
       state: EventState.DRAFT,
       visibility: createEventDto.visibility ?? EventVisibility.PUBLIC,
       ownerUserId,
-    } as Partial<Event>);
+    });
 
-    return this.repository.save(event);
+    return this.eventRepository.save(event);
   }
 
-  async findOne(idOrSlug: string): Promise<Event> {
-    // try numeric id first
-    const asNumber = Number(idOrSlug);
-    let event: Event | null = null;
-    if (!Number.isNaN(asNumber)) {
-      event = await this.repository.findOne({ where: { id: asNumber } as any });
+  async findAll(query: {
+    q?: string;
+    from?: string;
+    to?: string;
+    visibility?: string;
+    state?: string;
+    page: number;
+    limit: number;
+  }) {
+    try {
+      this.logger.log(`findAll querying with ${JSON.stringify(query)}`);
+    } catch {
+      /* ignore */
     }
+    const qb = this.eventRepository.createQueryBuilder('event');
+
+    // Filters
+    if (query.q) {
+      qb.andWhere('(event.title ILIKE :q OR event.summary ILIKE :q)', {
+        q: `%${query.q}%`,
+      });
+    }
+    if (query.from) {
+      qb.andWhere('event.startsAt >= :from', { from: new Date(query.from) });
+    }
+    if (query.to) {
+      qb.andWhere('event.startsAt <= :to', { to: new Date(query.to) });
+    }
+    if (query.visibility) {
+      qb.andWhere('event.visibility = :visibility', {
+        visibility: query.visibility,
+      });
+    } else {
+      qb.andWhere('event.visibility = :visibility', {
+        visibility: EventVisibility.PUBLIC,
+      });
+    }
+    if (query.state) {
+      qb.andWhere('event.state = :state', { state: query.state });
+    } else {
+      qb.andWhere('event.state = :state', { state: EventState.PUBLISHED });
+    }
+
+    // Pagination
+    qb.skip((query.page - 1) * query.limit).take(query.limit);
+
+    // Order by startsAt
+    qb.orderBy('event.startsAt', 'ASC');
+
+    const [events, total] = await qb.getManyAndCount();
+    return { events, total, page: query.page, limit: query.limit };
+  }
+
+  async findOneByIdOrSlug(
+    idOrSlug: number | string,
+    requester?: { id: number; isAdmin: boolean },
+  ): Promise<Event> {
+    try {
+      this.logger.log(`findOneByIdOrSlug called with ${String(idOrSlug)}`);
+    } catch {
+      /* ignore */
+    }
+    const qb = this.eventRepository.createQueryBuilder('event');
+    if (typeof idOrSlug === 'number') {
+      qb.where('event.id = :id', { id: idOrSlug });
+    } else {
+      qb.where('event.slug = :slug', { slug: idOrSlug });
+    }
+
+    const event = await qb.getOne();
     if (!event) {
-      event = await this.repository.findOne({ where: { slug: idOrSlug } as any });
+      try {
+        this.logger.log(`event not found for ${String(idOrSlug)}`);
+      } catch {
+        /* ignore */
+      }
+      throw new NotFoundException('Event not found');
     }
-    if (!event) {
-      throw new NotFoundException(`Event with id/slug ${idOrSlug} not found`);
+
+    // Check visibility
+    if (event.state !== EventState.PUBLISHED) {
+      if (
+        !requester ||
+        (requester.id !== event.ownerUserId && !requester.isAdmin)
+      ) {
+        throw new ForbiddenException('Access denied');
+      }
     }
+
     return event;
   }
 
-  private toSlug(input: string): string {
-    return input
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 240);
+  async update(
+    id: number,
+    updateEventDto: UpdateEventDto,
+    requester: { id: number; isAdmin: boolean },
+  ): Promise<Event> {
+    try {
+      this.logger.log(
+        `update called id=${id} by requester=${JSON.stringify(requester)}`,
+      );
+    } catch {
+      /* ignore */
+    }
+    const event = await this.eventRepository.findOneBy({ id });
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    // Check ownership/admin
+    if (requester.id !== event.ownerUserId && !requester.isAdmin) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    // Validate dates if updating
+    let startsAt = event.startsAt;
+    let endsAt = event.endsAt;
+    if (updateEventDto.startsAt) {
+      startsAt = new Date(updateEventDto.startsAt);
+    }
+    if (updateEventDto.endsAt) {
+      endsAt = new Date(updateEventDto.endsAt);
+    }
+    if (endsAt <= startsAt) {
+      throw new BadRequestException('endsAt must be after startsAt');
+    }
+
+    // Update slug if provided
+    let slug = event.slug;
+    if (updateEventDto.slug) {
+      slug = await this.ensureUniqueSlug(updateEventDto.slug, id);
+    }
+
+    // Update fields
+    Object.assign(event, {
+      ...updateEventDto,
+      startsAt,
+      endsAt,
+      registrationOpensAt: updateEventDto.registrationOpensAt
+        ? new Date(updateEventDto.registrationOpensAt)
+        : event.registrationOpensAt,
+      registrationClosesAt: updateEventDto.registrationClosesAt
+        ? new Date(updateEventDto.registrationClosesAt)
+        : event.registrationClosesAt,
+      slug,
+    });
+
+    return this.eventRepository.save(event);
   }
 
-  private async ensureUniqueSlug(baseSlug: string, excludeId?: number): Promise<string> {
+  async publish(
+    id: number,
+    requester: { id: number; isAdmin: boolean },
+  ): Promise<Event> {
+    try {
+      this.logger.log(
+        `publish called id=${id} by requester=${JSON.stringify(requester)}`,
+      );
+    } catch {
+      /* ignore */
+    }
+    const event = await this.eventRepository.findOneBy({ id });
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    // Check ownership/admin
+    if (requester.id !== event.ownerUserId && !requester.isAdmin) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    // Check valid transition
+    if (
+      event.state !== EventState.DRAFT &&
+      event.state !== EventState.ARCHIVED
+    ) {
+      throw new BadRequestException(
+        'Can only publish draft or archived events',
+      );
+    }
+
+    event.state = EventState.PUBLISHED;
+    return this.eventRepository.save(event);
+  }
+
+  private async ensureUniqueSlug(
+    baseSlug: string,
+    excludeId?: number,
+  ): Promise<string> {
     let slug = baseSlug;
     let counter = 1;
     while (true) {
-      const existing = await this.repository.findOne({ where: { slug } as any, select: ['id'] as any });
-      if (!existing || (excludeId && existing.id === excludeId)) {
+      const existing = await this.eventRepository.findOne({
+        where: { slug },
+        select: ['id'],
+      });
+      if (!existing || existing.id === excludeId) {
         break;
       }
       slug = `${baseSlug}-${counter}`;
