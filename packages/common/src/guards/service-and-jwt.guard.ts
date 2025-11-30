@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ServiceTokenGuard } from './service-token.guard';
 import { lastValueFrom } from 'rxjs';
@@ -8,7 +13,10 @@ import { lastValueFrom } from 'rxjs';
  * Use this for internal service-to-service calls that also need user context.
  */
 @Injectable()
-export class ServiceAndJwtGuard extends AuthGuard('jwt') implements CanActivate {
+export class ServiceAndJwtGuard
+  extends AuthGuard('jwt')
+  implements CanActivate
+{
   private readonly serviceGuard = new ServiceTokenGuard();
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

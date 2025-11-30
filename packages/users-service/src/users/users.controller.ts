@@ -18,7 +18,13 @@ import { UsersService } from './users.service';
 import { ValidateUserDto } from './dto/validate-user.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UserDto } from './dto/user.dto';
-import { RolesGuard, Roles, OwnerId, ServiceAndJwtGuard, ServiceTokenGuard } from '@aurora/common';
+import {
+  RolesGuard,
+  Roles,
+  OwnerId,
+  ServiceAndJwtGuard,
+  ServiceTokenGuard,
+} from '@aurora/common';
 
 @ApiTags('users')
 @Controller('users')
@@ -33,7 +39,9 @@ export class UsersController {
   @Post('validate')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ServiceTokenGuard)
-  @ApiOperation({ summary: 'Validate credentials (internal - service-to-service only)' })
+  @ApiOperation({
+    summary: 'Validate credentials (internal - service-to-service only)',
+  })
   @ApiResponse({ status: 200, description: 'Valid credentials', type: UserDto })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   validate(@Body() dto: ValidateUserDto) {
@@ -65,17 +73,31 @@ export class UsersController {
   ) {
     const pageNum = Number(page) || 1;
     const limitNum = Math.min(Number(limit) || 10, 100);
-    const filters = { q, role, isActive: isActive === undefined ? undefined : isActive === 'true' };
+    const filters = {
+      q,
+      role,
+      isActive: isActive === undefined ? undefined : isActive === 'true',
+    };
     return this.usersService.list({ page: pageNum, limit: limitNum, filters });
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update user' })
   @UseGuards(ServiceAndJwtGuard, RolesGuard)
-  update(@Param('id') id: string, @Body() dto: any, @OwnerId() requesterId?: number, @Req() req?: any) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: any,
+    @OwnerId() requesterId?: number,
+    @Req() req?: any,
+  ) {
     const authUser = req?.user as unknown as { roles?: string[] } | undefined;
-    const isAdmin = Array.isArray(authUser?.roles) && authUser!.roles!.includes('admin');
-    return this.usersService.update(id, dto, requesterId == null ? undefined : { id: requesterId, isAdmin });
+    const isAdmin =
+      Array.isArray(authUser?.roles) && authUser!.roles!.includes('admin');
+    return this.usersService.update(
+      id,
+      dto,
+      requesterId == null ? undefined : { id: requesterId, isAdmin },
+    );
   }
 
   @Delete(':id')
@@ -99,10 +121,18 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'User found', type: UserDto })
   @ApiResponse({ status: 404, description: 'User not found' })
   @UseGuards(ServiceAndJwtGuard, RolesGuard)
-  async getById(@Param('id') id: string, @OwnerId() requesterId?: number, @Req() req?: any) {
+  async getById(
+    @Param('id') id: string,
+    @OwnerId() requesterId?: number,
+    @Req() req?: any,
+  ) {
     const authUser = req?.user as unknown as { roles?: string[] } | undefined;
-    const isAdmin = Array.isArray(authUser?.roles) && authUser!.roles!.includes('admin');
-    return this.usersService.findOne(id, requesterId == null ? undefined : { id: requesterId, isAdmin });
+    const isAdmin =
+      Array.isArray(authUser?.roles) && authUser!.roles!.includes('admin');
+    return this.usersService.findOne(
+      id,
+      requesterId == null ? undefined : { id: requesterId, isAdmin },
+    );
   }
 
   // NOTE: internal unauthenticated endpoint removed. Service-to-service calls

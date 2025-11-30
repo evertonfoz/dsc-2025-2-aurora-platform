@@ -173,6 +173,15 @@ jobs:
       - name: Test (workspaces)
         if: steps.detect.outputs.has_node == 'true' && steps.ws.outputs.has_ws == 'true'
         run: npm -ws run test --if-present -- --ci
+      - name: Integration tests (auth-service)
+        if: steps.detect.outputs.has_node == 'true' && steps.ws.outputs.has_ws == 'true'
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_USER: postgres
+          DB_PASS: postgres
+          DB_NAME: aurora_users
+        run: npm --workspace @aurora/auth-service run test -- --testPathPattern=integration --ci
       - name: No Node project — test skipped (pass)
         if: steps.detect.outputs.has_node != 'true'
         run: echo "No package.json at repo root. Test skipped."

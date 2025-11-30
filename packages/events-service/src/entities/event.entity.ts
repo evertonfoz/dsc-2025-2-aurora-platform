@@ -32,7 +32,11 @@ export class Event {
   @Column({ type: 'enum', enum: EventState, default: EventState.DRAFT })
   state: EventState;
 
-  @Column({ type: 'enum', enum: EventVisibility, default: EventVisibility.PUBLIC })
+  @Column({
+    type: 'enum',
+    enum: EventVisibility,
+    default: EventVisibility.PUBLIC,
+  })
   visibility: EventVisibility;
 
   @Column({ type: 'timestamptz' })

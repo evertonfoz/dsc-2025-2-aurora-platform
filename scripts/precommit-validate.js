@@ -9,17 +9,34 @@ function run(cmd, args, opts = {}) {
 
 function main() {
   const root = path.resolve(__dirname, '..');
-  console.log('Running pre-commit validation (build + auto-fix attempts)...');
+  console.log('Running pre-commit validation (build + test + auto-fix attempts)...');
 
   const maxAttempts = 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     console.log(`\nAttempt ${attempt}/${maxAttempts}: running workspace build`);
-    // run top-level build which invokes workspace builds
+    
+    // Build common first
+    if (!run('npm', ['--workspace', '@aurora/common', 'run', 'build', '--if-present'])) {
+      console.warn('Build @aurora/common failed.');
+    }
+    
+    // Run top-level build which invokes workspace builds
     if (run('npm', ['run', 'build'])) {
-      console.log('Build succeeded.');
-      // Stage any fixes made by format/lint
-      run('git', ['add', '-A']);
-      return process.exit(0);
+      console.log('Build succeeded. Running tests...');
+      
+      // Run tests
+      if (run('npm', ['run', 'test', '--if-present'])) {
+        console.log('Tests passed.');
+        // Stage any fixes made by format/lint
+        run('git', ['add', '-A']);
+        return process.exit(0);
+      } else {
+        console.warn('Tests failed.');
+        if (attempt < maxAttempts) {
+          console.log('Retrying...');
+          continue;
+        }
+      }
     }
 
     console.warn('Build failed. Trying automated fixes: prettier, eslint --fix, build common.');
@@ -32,12 +49,9 @@ function main() {
 
     // Build common package specifically (helps TS path issues)
     run('npm', ['--workspace', '@aurora/common', 'run', 'build', '--if-present']);
-
-    // small pause
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
   }
 
-  console.error('\nPre-commit validation failed after multiple attempts. Please run `npm run build` locally and fix TypeScript errors.');
+  console.error('\nPre-commit validation failed after multiple attempts. Please run `npm run build && npm test` locally and fix errors.');
   process.exit(1);
 }
 

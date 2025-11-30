@@ -17,7 +17,10 @@ export type AccessTokenPayload = AuthUser & {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(@Optional() private readonly config?: ConfigService, private readonly users?: UsersHttpClient) {
+  constructor(
+    @Optional() private readonly config?: ConfigService,
+    private readonly users?: UsersHttpClient,
+  ) {
     const resolvedSecret =
       config?.get<string>('JWT_ACCESS_SECRET') ?? process.env.JWT_ACCESS_SECRET;
 
@@ -38,15 +41,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: AccessTokenPayload): Promise<AuthUser> {
     const { sub, email, roles, iat } = payload;
-    
+
     // if users client available, check lastLogoutAt
     if (this.users) {
       try {
         const u = await this.users.getById(sub);
-        
+
         if (u?.lastLogoutAt) {
           const last = Date.parse(u.lastLogoutAt) / 1000; // seconds
-          
+
           if (iat <= last) {
             throw new UnauthorizedException('Token revoked (user logged out)');
           }
@@ -58,7 +61,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         }
       }
     }
-    
+
     return { sub, email, roles: Array.isArray(roles) ? roles : [] };
   }
 }

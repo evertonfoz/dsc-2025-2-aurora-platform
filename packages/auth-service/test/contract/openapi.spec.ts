@@ -17,7 +17,8 @@ describe('OpenAPI contract - auth-service', () => {
     expect(login).toBeDefined();
     expect(login.post).toBeDefined();
 
-    const requestSchema = login.post.requestBody.content['application/json'].schema;
+    const requestSchema =
+      login.post.requestBody.content['application/json'].schema;
     expect(requestSchema.type).toBe('object');
     expect(requestSchema.required).toContain('email');
     expect(requestSchema.required).toContain('password');
@@ -28,7 +29,8 @@ describe('OpenAPI contract - auth-service', () => {
     expect(refresh).toBeDefined();
     expect(refresh.post).toBeDefined();
 
-    const requestSchema = refresh.post.requestBody.content['application/json'].schema;
+    const requestSchema =
+      refresh.post.requestBody.content['application/json'].schema;
     expect(requestSchema.type).toBe('object');
     expect(requestSchema.required).toContain('refreshToken');
   });

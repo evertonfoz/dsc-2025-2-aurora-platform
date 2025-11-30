@@ -60,7 +60,9 @@ export class CreateEventsTable1699740001000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP TABLE IF EXISTS events.events CASCADE`);
-    await queryRunner.query(`DROP TYPE IF EXISTS events.events_visibility_enum`);
+    await queryRunner.query(
+      `DROP TYPE IF EXISTS events.events_visibility_enum`,
+    );
     await queryRunner.query(`DROP TYPE IF EXISTS events.events_state_enum`);
   }
 }
