@@ -11,7 +11,7 @@ const config: Config = {
   },
   // Only run integration tests
   testMatch: ['**/integration/**/*.spec.ts'],
-  testTimeout: 30000,
+  testTimeout: 60000, // 60 seconds for container startup
 };
 
 export default config;
