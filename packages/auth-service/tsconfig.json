@@ -13,8 +13,8 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@aurora/common": ["../common/dist"],
-      "@aurora/common/*": ["../common/dist/*"]
+      "@aurora/common": ["../common/src"],
+      "@aurora/common/*": ["../common/src/*"]
     }
   },
   "include": ["src/**/*", "test/**/*"]

@@ -5,8 +5,8 @@
     "rootDir": ".",
     "baseUrl": ".",
     "paths": {
-      "@aurora/common": ["../common/dist"],
-      "@aurora/common/*": ["../common/dist/*"]
+      "@aurora/common": ["../common/src"],
+      "@aurora/common/*": ["../common/src/*"]
     },
     "outDir": "dist",
     "declaration": true,
