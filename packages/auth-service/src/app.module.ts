@@ -16,6 +16,8 @@ config();
       database: process.env.DB_NAME ?? 'aurora_db',
       schema: process.env.DB_SCHEMA ?? 'auth',
       entities: [__dirname + '/**/*.entity.{ts,js}'],
+      migrations: [__dirname + '/migrations/*.{ts,js}'],
+      migrationsRun: true,
       synchronize: false,
       logging: process.env.DB_LOGGING === 'true',
       extra: { options: `-c search_path=${process.env.DB_SCHEMA ?? 'auth'}` },

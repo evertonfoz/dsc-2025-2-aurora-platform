@@ -26,6 +26,6 @@
     "strictBindCallApply": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules", "**/*.spec.ts", "**/*.e2e-spec.ts", "test", "tests", "packages"]
+  "include": ["packages/**/*"],
+  "exclude": ["dist", "node_modules", "**/*.spec.ts", "**/*.e2e-spec.ts", "test", "tests"]
 }

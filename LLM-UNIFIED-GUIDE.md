@@ -71,8 +71,8 @@ IMPORTANT: LLMs devem sempre separar specs por método/ação automaticamente ao
 Exemplo rápido de import em `test/events/events.service.spec.ts`:
 
 ```ts
-import { EventsService } from '../../src/events/events.service';
-import { Event } from '../../src/events/entities/event.entity';
+import { EventsService } from 'packages/events-service/src/events/events.service';
+import { Event } from 'packages/events-service/src/events/entities/event.entity';
 ```
 
 Adicione este padrão à checklist do PR (ex: "[x] Testes colocados em `test/` conforme convenção").
@@ -107,8 +107,8 @@ providers: [
   - Ao importar código de produção desde `test/`, use caminhos relativos para `src`, por exemplo:
 
 ```ts
-import { EventsService } from '../../src/events/events.service';
-import { Event } from '../../src/events/entities/event.entity';
+import { EventsService } from 'packages/events-service/src/events/events.service';
+import { Event } from 'packages/events-service/src/events/entities/event.entity';
 ```
 
 - Testes unitários vs testes de integração:
@@ -158,8 +158,8 @@ Para reduzir duplicação e aumentar a clareza dos specs, adote factories de tes
 
 ```ts
 // test/factories/event.factory.ts
-import { CreateEventDto } from '../../src/events/dto/create-event.dto';
-import { Event } from '../../src/events/entities/event.entity';
+import { CreateEventDto } from 'packages/events-service/src/events/dto/create-event.dto';
+import { Event } from 'packages/events-service/src/events/entities/event.entity';
 
 export function makeCreateEventDto(overrides?: Partial<CreateEventDto>): CreateEventDto { /* ... */ }
 export function makeEventEntity(overrides?: Partial<Event>): Partial<Event> { /* ... */ }

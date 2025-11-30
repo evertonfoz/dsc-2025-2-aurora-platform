@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { AppDataSource } from './data-source';
 import { User } from './users/entities/user.entity';
-import * as argon2 from 'argon2';
+import * as bcrypt from 'bcryptjs';
 
 async function checkUsers() {
   try {
@@ -16,7 +16,8 @@ async function checkUsers() {
 
     const existingAdmin = await userRepo.findOne({ where: { email: adminEmail } });
     if (!existingAdmin) {
-      const passwordHash = await argon2.hash('AdminP@ss1');
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash('AdminP@ss1', salt);
       const admin = userRepo.create({ name: 'Admin User', email: adminEmail, passwordHash });
       await userRepo.save(admin);
       console.log('Seeded admin user');
@@ -24,7 +25,8 @@ async function checkUsers() {
 
     const existingTest = await userRepo.findOne({ where: { email: testEmail } });
     if (!existingTest) {
-      const passwordHash = await argon2.hash('StrongP@ssw0rd');
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash('StrongP@ssw0rd', salt);
       const testUser = userRepo.create({ name: 'Test User', email: testEmail, passwordHash });
       await userRepo.save(testUser);
       console.log('Seeded test user');
