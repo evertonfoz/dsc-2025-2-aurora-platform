@@ -11,6 +11,8 @@
   ],
   "scripts": {
     "build": "npm -ws run build --if-present",
+    "prepare": "husky install",
+    "precommit:validate": "node scripts/precommit-validate.js",
     "format": "prettier --write \"packages/**/src/**/*.ts\" \"packages/**/test/**/*.ts\"",
     "start": "npm -ws run start --if-present",
     "start:dev": "npm -ws run start:dev --if-present",
@@ -51,6 +53,7 @@
     "typeorm": "^0.3.26"
   },
   "devDependencies": {
+    "husky": "^8.0.0",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
     "@nestjs/cli": "^11.0.0",
