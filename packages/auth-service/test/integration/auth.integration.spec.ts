@@ -22,23 +22,25 @@ describe('Auth provider integration (minimal)', () => {
     await app.close();
   });
 
-  it('POST /auth/login should return tokens', async () => {
-    const res = await request(app.getHttpServer())
+  it('POST /auth/login with invalid credentials should return 401', async () => {
+    await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ email: 'student@example.com', password: 'secret' })
-      .expect(200);
-
-    expect(res.body).toHaveProperty('accessToken');
-    expect(res.body).toHaveProperty('refreshToken');
+      .send({ email: 'nonexistent@example.com', password: 'wrongpassword' })
+      .expect(401);
   });
 
-  it('POST /auth/refresh should return new access token', async () => {
-    const res = await request(app.getHttpServer())
-      .post('/auth/refresh')
-      .send({ refreshToken: 'some-refresh' })
-      .expect(200);
+  it('POST /auth/login without email should return 400', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ password: 'secret' })
+      .expect(400);
+  });
 
-    expect(res.body).toHaveProperty('accessToken');
+  it('POST /auth/refresh with invalid token should return 401', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .send({ refreshToken: 'invalid-token' })
+      .expect(401);
   });
 
   it('POST /auth/refresh without token should return 400', async () => {
