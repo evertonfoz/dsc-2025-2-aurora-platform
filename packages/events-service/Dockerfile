@@ -1,43 +1,35 @@
-FROM node:20-alpine AS builder
-WORKDIR /app
+FROM node:18-alpine AS builder
+WORKDIR /usr/src/app
 
-# copy local common package so npm can resolve file:../common
+# copy the local common package into the image so npm can resolve file:../common
 COPY packages/common /usr/src/common
 
 # build and install @aurora/common first so its deps are available
 WORKDIR /usr/src/common
-RUN npm install --no-audit --no-fund
+RUN npm install --no-package-lock
 RUN npm run build
 
 # now install events-service with its deps (including @aurora/common file:../common)
-WORKDIR /app
-COPY packages/events-service/package.json ./
-RUN npm install --no-audit --no-fund
+WORKDIR /usr/src/app
+COPY packages/events-service/package.json packages/events-service/package-lock.json* ./
 
+RUN npm install --no-package-lock
+
+# copy source files for events-service and build
 COPY packages/events-service .
+RUN npm run build
 
-# Build TypeScript (optional; start:dev uses ts-node)
-RUN npm run build || true
+FROM node:18-alpine AS runner
+WORKDIR /usr/src/app
 
-FROM node:20-alpine AS runner
-WORKDIR /app
+# copy package.json so npm commands in compose can run (compose overrides command)
+COPY packages/events-service/package.json ./package.json
 
-# copy common so symlink resolves at runtime
+# copy node_modules and built artifacts from builder to runner
+COPY --from=builder /usr/src/app/node_modules ./node_modules
+COPY --from=builder /usr/src/app/dist ./dist
+## ensure the local common package copied in the builder is available at runtime
 COPY --from=builder /usr/src/common /usr/src/common
 
-# copy package.json so npm commands work
-COPY packages/events-service/package.json ./
-COPY packages/events-service/package-lock.json ./
-
-# copy node_modules and built artifacts
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-
-# copy source files for ts-node
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
-COPY --from=builder /app/tsconfig.nest.json ./tsconfig.nest.json
-
 EXPOSE 3012
-
-CMD ["npm", "run", "start:dev"]
+CMD ["node", "dist/main.js"]

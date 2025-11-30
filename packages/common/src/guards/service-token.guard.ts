@@ -10,7 +10,8 @@ import {
 export class ServiceTokenGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest();
-    const header = req.headers['x-service-token'] ?? req.headers['X-Service-Token'];
+    const header =
+      req.headers['x-service-token'] ?? req.headers['X-Service-Token'];
     const token = Array.isArray(header) ? header[0] : header;
     const expected = process.env.SERVICE_TOKEN;
     // If server is configured with the insecure default token, refuse and ask
@@ -20,11 +21,17 @@ export class ServiceTokenGuard implements CanActivate {
     if (!expected || expected === insecureDefault) {
       // Do not echo the token value in logs.
       // Fail closed: require a proper SERVICE_TOKEN in the environment.
-      throw new HttpException('Service token not configured properly', HttpStatus.UNAUTHORIZED);
+      throw new HttpException(
+        'Service token not configured properly',
+        HttpStatus.UNAUTHORIZED,
+      );
     }
 
     if (String(token) !== String(expected)) {
-      throw new HttpException('Service token required', HttpStatus.UNAUTHORIZED);
+      throw new HttpException(
+        'Service token required',
+        HttpStatus.UNAUTHORIZED,
+      );
     }
 
     // When service token is valid, inject a trusted internal service user

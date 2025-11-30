@@ -88,6 +88,11 @@ jobs:
           fi
       - run: npm ci
         if: steps.detect.outputs.has_node == 'true'
+
+      - name: Build @aurora/common first
+        if: steps.detect.outputs.has_node == 'true' && steps.ws.outputs.has_ws == 'true'
+        run: npm --workspace @aurora/common run build --if-present
+
       - name: Build (root)
         if: steps.detect.outputs.has_node == 'true' && steps.ws.outputs.has_ws == 'false'
         run: npm run build --if-present
@@ -168,11 +173,25 @@ jobs:
       - name: Test (workspaces)
         if: steps.detect.outputs.has_node == 'true' && steps.ws.outputs.has_ws == 'true'
         run: npm -ws run test --if-present -- --ci
+      - name: Integration tests (auth-service)
+        if: steps.detect.outputs.has_node == 'true' && steps.ws.outputs.has_ws == 'true'
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_USER: postgres
+          DB_PASS: postgres
+          DB_NAME: aurora_users
+        run: |
+          # Create required schemas
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d aurora_users -c "CREATE SCHEMA IF NOT EXISTS auth;"
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d aurora_users -c "CREATE SCHEMA IF NOT EXISTS users;"
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d aurora_users -c "CREATE SCHEMA IF NOT EXISTS events;"
+          # Run integration tests
+          npm --workspace auth-service run test:integration -- --ci
       - name: No Node project — test skipped (pass)
         if: steps.detect.outputs.has_node != 'true'
         run: echo "No package.json at repo root. Test skipped."
 
-  # Smoke job: runs DB-dependent smoke/integration tests against a Postgres service.
   smoke:
     runs-on: ubuntu-latest
     needs: build
@@ -230,9 +249,7 @@ jobs:
           DEBUG: typeorm:*
         run: |
           set -x
-          # Capture stdout/stderr to migration.log and fail loudly with contents on error
           npm run migration:run 2>&1 | tee migration.log || (cat migration.log && exit 1)
-          # Also print the log for successful runs
           cat migration.log || true
       - name: Upload migration log
         if: always()
@@ -248,19 +265,16 @@ jobs:
           DB_PASS: postgres
           DB_NAME: aurora_users
         run: |
-          # If repo root has test/smoke, run it
           if [ -d "test/smoke" ]; then
             echo "Running root smoke tests..."
             npm run test -- test/smoke --runInBand
             exit $?
           fi
 
-          # Otherwise look for packages with test/smoke and run them per-package
           found=0
           for pkg in packages/*; do
             if [ -d "$pkg/test/smoke" ]; then
               echo "Running smoke tests for package: $pkg"
-              # Use npm --prefix to run test in the package directory
               npm --prefix "$pkg" run test -- test/smoke --runInBand || exit 1
               found=1
             fi

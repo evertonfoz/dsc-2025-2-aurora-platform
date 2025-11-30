@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreateAuthRefreshTokens1700300000000 implements MigrationInterface {
+export class CreateAuthRefreshTokens1700300000000
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Garante que o schema exista (idempotente)
     await queryRunner.query(`CREATE SCHEMA IF NOT EXISTS auth`);
@@ -21,11 +23,17 @@ export class CreateAuthRefreshTokens1700300000000 implements MigrationInterface 
       )
     `);
 
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS IDX_auth_refresh_userid ON auth.auth_refresh_tokens ("userId")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS IDX_auth_refresh_expires ON auth.auth_refresh_tokens ("expiresAt")`);
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS IDX_auth_refresh_userid ON auth.auth_refresh_tokens ("userId")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS IDX_auth_refresh_expires ON auth.auth_refresh_tokens ("expiresAt")`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP TABLE IF EXISTS auth.auth_refresh_tokens CASCADE`);
+    await queryRunner.query(
+      `DROP TABLE IF EXISTS auth.auth_refresh_tokens CASCADE`,
+    );
   }
 }

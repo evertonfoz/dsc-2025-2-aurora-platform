@@ -10,8 +10,8 @@
   "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
   "demo": "ts-node-dev --respawn --transpile-only src/main.ts",
     "test": "jest",
-    "contract:test": "jest --testPathPattern=contract",
-    "integration:test": "jest --testPathPattern=integration"
+    "test:integration": "jest --config jest.integration.config.ts",
+    "contract:test": "jest --testPathPattern=contract"
   },
   "license": "MIT",
   "dependencies": {

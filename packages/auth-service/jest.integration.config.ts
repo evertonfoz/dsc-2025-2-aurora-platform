@@ -1,4 +1,4 @@
-import type {Config} from 'jest';
+import type { Config } from 'jest';
 
 const config: Config = {
   preset: 'ts-jest',
@@ -9,9 +9,9 @@ const config: Config = {
     '^@aurora/common$': '<rootDir>/../common/src',
     '^@aurora/common/(.*)$': '<rootDir>/../common/src/$1',
   },
-  // Exclude integration tests by default (they require DB)
-  // Run with: npm test -- --testPathPattern=integration
-  testPathIgnorePatterns: ['/node_modules/', '/integration/'],
+  // Only run integration tests
+  testMatch: ['**/integration/**/*.spec.ts'],
+  testTimeout: 30000,
 };
 
 export default config;

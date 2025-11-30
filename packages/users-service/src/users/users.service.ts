@@ -8,10 +8,18 @@ import { User } from './entities/user.entity';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
-  constructor(@InjectRepository(User) private readonly repo: Repository<User>) {}
+  constructor(
+    @InjectRepository(User) private readonly repo: Repository<User>,
+  ) {}
 
   private toDto(u: User): UserDto {
-    return { id: String(u.id), email: u.email, name: u.name, roles: [u.role], lastLogoutAt: u.lastLogoutAt ? u.lastLogoutAt.toISOString() : null } as UserDto;
+    return {
+      id: String(u.id),
+      email: u.email,
+      name: u.name,
+      roles: [u.role],
+      lastLogoutAt: u.lastLogoutAt ? u.lastLogoutAt.toISOString() : null,
+    } as UserDto;
   }
 
   async setLastLogoutAt(id: string, date: Date): Promise<UserDto> {
@@ -28,25 +36,45 @@ export class UsersService implements OnModuleInit {
     const adminEmail = 'admin.user@example.com';
     const testEmail = 'test.user@example.com';
 
-    const existingAdmin = await this.repo.findOne({ where: { email: ILike(adminEmail) } as any });
+    const existingAdmin = await this.repo.findOne({
+      where: { email: ILike(adminEmail) } as any,
+    });
     if (!existingAdmin) {
       const salt = await bcrypt.genSalt(10);
       const passwordHash = await bcrypt.hash('AdminP@ss1', salt);
-      const admin = this.repo.create({ name: 'Admin User', email: adminEmail, passwordHash } as any);
+      const admin = this.repo.create({
+        name: 'Admin User',
+        email: adminEmail,
+        passwordHash,
+      } as any);
       await this.repo.save(admin);
     }
 
-    const existingTest = await this.repo.findOne({ where: { email: ILike(testEmail) } as any });
+    const existingTest = await this.repo.findOne({
+      where: { email: ILike(testEmail) } as any,
+    });
     if (!existingTest) {
       const salt = await bcrypt.genSalt(10);
       const passwordHash = await bcrypt.hash('StrongP@ssw0rd', salt);
-      const testUser = this.repo.create({ name: 'Test User', email: testEmail, passwordHash } as any);
+      const testUser = this.repo.create({
+        name: 'Test User',
+        email: testEmail,
+        passwordHash,
+      } as any);
       await this.repo.save(testUser);
     }
   }
 
   async create(createUserDto: CreateUserDto): Promise<UserDto> {
-    const passwordHash = createUserDto.password ? await (async () => { const s = await bcrypt.genSalt(10); return bcrypt.hash(createUserDto.password + (process.env.HASH_PEPPER ?? ''), s); })() : '';
+    const passwordHash = createUserDto.password
+      ? await (async () => {
+          const s = await bcrypt.genSalt(10);
+          return bcrypt.hash(
+            createUserDto.password + (process.env.HASH_PEPPER ?? ''),
+            s,
+          );
+        })()
+      : '';
     const user = this.repo.create({
       name: createUserDto.name ?? createUserDto.email,
       email: createUserDto.email,
@@ -56,19 +84,28 @@ export class UsersService implements OnModuleInit {
     return this.toDto(saved);
   }
 
-  async findOne(id: string, _ctx?: { id?: number; isAdmin?: boolean }): Promise<UserDto> {
+  async findOne(
+    id: string,
+    _ctx?: { id?: number; isAdmin?: boolean },
+  ): Promise<UserDto> {
     const asNumber = Number(id);
     const user = await this.repo.findOne({ where: { id: asNumber } as any });
     if (!user) throw new NotFoundException(`User with id ${id} not found`);
     return this.toDto(user);
   }
 
-  async validateCredentials(email: string, password: string): Promise<UserDto | null> {
-    const user = await this.repo.findOne({ where: { email: ILike(email) } as any });
+  async validateCredentials(
+    email: string,
+    password: string,
+  ): Promise<UserDto | null> {
+    const user = await this.repo.findOne({
+      where: { email: ILike(email) } as any,
+    });
     if (!user) return null;
     try {
       const pepper = process.env.HASH_PEPPER ?? '';
-      if (await bcrypt.compare(password + pepper, user.passwordHash)) return this.toDto(user);
+      if (await bcrypt.compare(password + pepper, user.passwordHash))
+        return this.toDto(user);
     } catch (e) {
       return null;
     }
@@ -80,13 +117,17 @@ export class UsersService implements OnModuleInit {
     const { page, limit, filters } = opts;
     const qb = this.repo.createQueryBuilder('user');
     if (filters?.q) {
-      qb.andWhere('(user.name ILIKE :q OR user.email ILIKE :q)', { q: `%${filters.q}%` });
+      qb.andWhere('(user.name ILIKE :q OR user.email ILIKE :q)', {
+        q: `%${filters.q}%`,
+      });
     }
     if (filters?.role) {
       qb.andWhere('user.role = :role', { role: filters.role });
     }
     if (filters?.isActive !== undefined) {
-      qb.andWhere('user.is_active = :isActive', { isActive: !!filters.isActive });
+      qb.andWhere('user.is_active = :isActive', {
+        isActive: !!filters.isActive,
+      });
     }
     const [data, total] = await qb
       .orderBy('user.id', 'DESC')
@@ -94,13 +135,17 @@ export class UsersService implements OnModuleInit {
       .take(limit)
       .getManyAndCount();
     return {
-      data: data.map(d => this.toDto(d)),
+      data: data.map((d) => this.toDto(d)),
       meta: { total, page, limit },
     };
   }
 
   // New: update
-  async update(id: string, dto: Partial<CreateUserDto> & any, _ctx?: { id?: number; isAdmin?: boolean }): Promise<UserDto> {
+  async update(
+    id: string,
+    dto: Partial<CreateUserDto> & any,
+    _ctx?: { id?: number; isAdmin?: boolean },
+  ): Promise<UserDto> {
     const asNumber = Number(id);
     const user = await this.repo.findOne({ where: { id: asNumber } as any });
     if (!user) throw new NotFoundException(`User with id ${id} not found`);

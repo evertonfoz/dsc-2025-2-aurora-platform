@@ -29,7 +29,8 @@ describe('Contract: packages/users-service/openapi.yaml', () => {
 
   test('POST /users requestBody referencia CreateUser (se aplicável)', () => {
     const post = spec.paths['/users'].post;
-    const ref = post?.requestBody?.content?.['application/json']?.schema?.['$ref'];
+    const ref =
+      post?.requestBody?.content?.['application/json']?.schema?.['$ref'];
     expect(ref || post.requestBody).toBeDefined();
     if (ref) {
       expect(ref).toMatch(/#\/components\/schemas\/CreateUser/);

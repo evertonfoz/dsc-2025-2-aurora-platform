@@ -17,7 +17,7 @@ export interface TokenRevocationValidator {
 /**
  * Guard that validates if an access token has been revoked by checking
  * if it was issued before the user's last logout timestamp.
- * 
+ *
  * This guard should run AFTER JWT authentication (so req.user exists).
  * It requires a TokenRevocationValidator service to be provided in the module.
  */

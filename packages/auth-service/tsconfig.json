@@ -3,6 +3,7 @@
     "module": "commonjs",
     "target": "es2020",
     "moduleResolution": "node",
+    "rootDir": "..",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "sourceMap": true,
@@ -13,9 +14,9 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@aurora/common": ["../common/dist"],
-      "@aurora/common/*": ["../common/dist/*"]
+      "@aurora/common": ["../common/src"],
+      "@aurora/common/*": ["../common/src/*"]
     }
   },
-  "include": ["src/**/*", "test/**/*"]
+  "include": ["src/**/*", "test/**/*", "../common/src/**/*"]
 }

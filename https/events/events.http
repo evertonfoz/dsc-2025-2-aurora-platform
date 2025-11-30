@@ -1,21 +1,129 @@
 ### Environment variables
 # Define these variables at the top so your HTTP client can resolve them.
-@host = http://localhost:3001
-@apiBase = {{host}}/v1
+@eventsHost = http://localhost:3012
+@authHost = http://localhost:3010
+
+# Base URLs
+@apiBase = {{eventsHost}}
 @eventId = 1
 @slug =
-@token = 
 
-### Get all Events (PROTECTED for this PR; could be PUBLIC if desired)
+# Capture tokens from the local `loginUsers` and `loginAdmin` requests (defined below)
+# This allows this file to be used standalone without running `https/auth.http`.
+@token = {{loginUsers.response.body.$.accessToken}}
+@refreshToken = {{loginUsers.response.body.$.refreshToken}}
+@adminToken = {{loginAdmin.response.body.$.accessToken}}
+
+# Service token for internal API calls (set to match your .env SERVICE_TOKEN)
+@serviceToken = Utfpr@2005
+
+
+### Local helper: login (named `loginUsers`)
+# @name loginUsers
+POST {{authHost}}/auth/login
+Accept: application/json
+Content-Type: application/json
+
+{
+  "email": "test.user@example.com",
+  "password": "StrongP@ssw0rd"
+}
+
+### Local helper: login admin (named `loginAdmin`)
+# @name loginAdmin
+POST {{authHost}}/auth/login
+Accept: application/json
+Content-Type: application/json
+
+{
+  "email": "admin.user@example.com",
+  "password": "AdminP@ss1"
+}
+
+
+### Local helper: logout (named `logoutUsers`)
+# @name logoutUsers
+POST {{authHost}}/auth/logout
+Accept: application/json
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+
+### Variante interna (service-token) - logout
+POST {{authHost}}/auth/logout
+Accept: application/json
+Content-Type: application/json
+x-service-token: {{serviceToken}}
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+
+### Get all Events (protected examples)
+### As test user (expected 401 - requires x-service-token)
 GET {{apiBase}}/events
 Accept: application/json
 Authorization: Bearer {{token}}
 
+### As test user WITH service token (expected 200)
+GET {{apiBase}}/events
+Accept: application/json
+Authorization: Bearer {{token}}
+x-service-token: {{serviceToken}}
+
+### As admin (explicit admin token)
+GET {{apiBase}}/events
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+### Internal/service call (requires x-service-token)
+GET {{apiBase}}/events
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+x-service-token: {{serviceToken}}
+
+
 ### Create Event (REQUIRES teacher|admin; ownerId comes from JWT sub, not body)
+### As test user (expected 401 if not allowed)
 POST {{apiBase}}/events
 Accept: application/json
 Content-Type: application/json
 Authorization: Bearer {{token}}
+
+{
+  "title": "Sample Event",
+  "summary": "This is a sample event summary",
+  "description": "Detailed description of the sample event",
+  "startsAt": "2025-12-01T10:00:00Z",
+  "endsAt": "2025-12-01T12:00:00Z",
+  "visibility": "public"
+}
+
+### As admin (may still require x-service-token depending on RBAC)
+POST {{apiBase}}/events
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "title": "Sample Event",
+  "summary": "This is a sample event summary",
+  "description": "Detailed description of the sample event",
+  "startsAt": "2025-12-01T10:00:00Z",
+  "endsAt": "2025-12-01T12:00:00Z",
+  "visibility": "public"
+}
+
+### Variante interna (service-token)
+POST {{apiBase}}/events
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+x-service-token: {{serviceToken}}
 
 {
   "title": "Sample Event",
@@ -34,7 +142,9 @@ if (body?.id) client.global.set("eventId", body.id);
 if (body?.slug) client.global.set("slug", body.slug);
 %}
 
+
 ### Publish Event (REQUIRES owner-or-admin)
+### As owner (test user)
 POST {{apiBase}}/events/{{eventId}}/publish
 Accept: application/json
 Authorization: Bearer {{token}}
@@ -47,22 +157,54 @@ try {
 } catch {}
 %}
 
-### List Published Events with filters (PROTECTED for this PR; could be PUBLIC)
+### As admin
+POST {{apiBase}}/events/{{eventId}}/publish
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+### Variante interna (service-token)
+POST {{apiBase}}/events/{{eventId}}/publish
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+x-service-token: {{serviceToken}}
+
+
+### List Published Events with filters (examples)
 GET {{apiBase}}/events?q=sample&from=2025-12-01T00:00:00Z&to=2025-12-31T23:59:59Z&page=1&limit=10
 Accept: application/json
 Authorization: Bearer {{token}}
 
-### Get Event by Slug (PROTECTED for this PR; could be PUBLIC)
+### Internal listing (service)
+GET {{apiBase}}/events?q=sample&page=1&limit=10
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+x-service-token: {{serviceToken}}
+
+
+### Get Event by Slug
+### As logged user
 GET {{apiBase}}/events/{{slug}}
 Accept: application/json
 Authorization: Bearer {{token}}
 
+### As admin
+GET {{apiBase}}/events/{{slug}}
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+### Internal (service-token)
+GET {{apiBase}}/events/{{slug}}
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+x-service-token: {{serviceToken}}
+
+
 # Notes
-# - Set `@token` to a valid JWT or leave empty for unsecured local testing.
+# - Set `@token` to a valid JWT (or enable automatic capture from Auth). Protected routes return 401 without a token.
 # - `@apiBase` includes `/v1` since many endpoints are versioned under `/v1`.
-# - Adjust `@host` if your server runs on a different port or host.
+# - Adjust `@eventsHost` and `@authHost` if your servers run on different ports or hosts.
 # - RBAC esperado:
 #   • POST /events → teacher|admin (ownerId = JWT.sub no backend)
 #   • POST /events/:id/publish → owner-or-admin
-#   • GETs podem ser LOGADO (como neste PR) ou PUBLIC conforme política do curso.
-# - Dica: após criar, o bloco acima salva automaticamente `@eventId` e `@slug` das respostas.
+#   • GET endpoints may be LOGGED or PUBLIC depending on policy.
+# - `POST /events` and `POST /events/:id/publish` include internal `x-service-token` variants for calls that originate from other services.
