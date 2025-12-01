@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16
+    container_name: aurora_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aurora_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - aurora_network
+
+  events-service:
+    build:
+      context: .
+      dockerfile: ./packages/events-service/Dockerfile
+    container_name: aurora_events_service
+    restart: unless-stopped
+    ports:
+      - '3012:3012'
+    # Load sensitive configuration (DB credentials, SERVICE_TOKEN, JWT secrets, etc.)
+    # from the repository `.env` file instead of baking them in the compose file.
+    env_file:
+      - .env
+    environment:
+      # Keep service-specific overrides here only (non-sensitive):
+      DB_SCHEMA: events
+      PORT: 3012
+      NODE_ENV: development
+    depends_on:
+      db:
+        condition: service_healthy
+    # development mount removed so the container runs the built image
+    # volumes:
+    #  - ./packages/events-service:/app
+    #  - /app/node_modules
+    command: node dist/main.js
+    networks:
+      - aurora_network
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: ./packages/auth-service/Dockerfile
+    container_name: aurora_auth_service
+    restart: unless-stopped
+    ports:
+      - '3010:3010'
+    # Load sensitive vars from .env and keep only non-sensitive overrides here
+    env_file:
+      - .env
+    environment:
+      # Keep service-specific overrides here only (non-sensitive):
+      DB_SCHEMA: auth
+      PORT: 3010
+      NODE_ENV: development
+      USERS_API_URL: 'http://users-service:3011'
+      DEV_AUTO_AUTH: 'true'
+    depends_on:
+      db:
+        condition: service_healthy
+    # development mount removed so the container runs the built image
+    # volumes:
+    #   - ./packages/auth-service:/app
+    #   - /app/node_modules
+    command: node dist/src/main.js
+    networks:
+      - aurora_network
+  
+  users-service:
+    build:
+      context: .
+      dockerfile: ./packages/users-service/Dockerfile
+    container_name: aurora_users_service
+    restart: unless-stopped
+    ports:
+      - '3011:3011'
+    # Load sensitive vars from .env and keep only non-sensitive overrides here
+    env_file:
+      - .env
+    environment:
+      PORT: 3011
+      NODE_ENV: development
+      # keep per-service DB_SCHEMA override
+      DB_SCHEMA: users
+    depends_on:
+      db:
+        condition: service_healthy
+    # do not mount local source nor override command so the image runs the compiled Nest app
+    command: "npm run start:prod"
+    networks:
+      - aurora_network
+
+volumes:
+  pgdata:
+
+networks:
+  aurora_network:
+    driver: bridge
