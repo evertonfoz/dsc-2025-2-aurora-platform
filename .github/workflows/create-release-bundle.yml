@@ -5,10 +5,8 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: read
+  contents: write  # Required for creating releases and tags
   packages: read
-  issues: write
-  checks: write
 
 jobs:
   build-and-release:
@@ -42,6 +40,8 @@ jobs:
       - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: deploy-bundle-${{ github.sha }}
           release_name: Deploy bundle for ${{ github.sha }}
@@ -52,6 +52,8 @@ jobs:
 
       - name: Upload release bundle
         uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ${{ steps.prepare.outputs.bundle }}
