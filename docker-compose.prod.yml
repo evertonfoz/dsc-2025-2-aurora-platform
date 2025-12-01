@@ -9,10 +9,11 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-aurora_users}
+      POSTGRES_DB: ${POSTGRES_DB:-aurora_db}
     volumes:
+      - ./postgres-init:/docker-entrypoint-initdb.d
       - pgdata:/var/lib/postgresql/data
-    # Do not expose Postgres on the host in production by default
+    # Em produção, não expor a porta se não for necessário
     # ports:
     #   - '5432:5432'
     healthcheck:
@@ -23,29 +24,73 @@ services:
     networks:
       - aurora_network
 
-  app:
-    image: ${DOCKER_IMAGE:-aurora_app:latest}
+  users-service:
+    image: ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/users-service:${USERS_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
       - .env.prod
-    ports:
-      - '${APP_PORT:-3001}:3001'
     environment:
       NODE_ENV: production
-      PORT: 3001
+      PORT: 3011
+      DB_SCHEMA: users
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
-      USERS_API_URL: ${USERS_API_URL:-http://localhost:3001/v1}
     depends_on:
       db:
         condition: service_healthy
-    # No bind-mounts in production; image should contain built app
-    # volumes: []
-    command: ["node", "dist/main.js"]
+    ports:
+      - "3011:3011"
+    networks:
+      - aurora_network
+
+  auth-service:
+    image: ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/auth-service:${AUTH_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      NODE_ENV: production
+      PORT: 3010
+      DB_SCHEMA: auth
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      USERS_API_URL: "http://users-service:3011"
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+    depends_on:
+      db:
+        condition: service_healthy
+      users-service:
+        condition: service_started
+    ports:
+      - "3010:3010"
+    networks:
+      - aurora_network
+
+  events-service:
+    image: ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/events-service:${EVENTS_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      NODE_ENV: production
+      PORT: 3012
+      DB_SCHEMA: events
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3012:3012"
     networks:
       - aurora_network
 
