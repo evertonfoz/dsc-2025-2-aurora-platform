@@ -33,4 +33,4 @@ COPY --from=builder /usr/src/app/dist ./dist
 
 # service listens on 3010 by default in this project
 EXPOSE 3010
-CMD ["node", "dist/src/main.js"]
+CMD ["node", "dist/app/src/main.js"]
