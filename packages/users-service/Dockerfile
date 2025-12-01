@@ -32,4 +32,4 @@ COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/common /usr/src/common
 
 EXPOSE 3011
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]
