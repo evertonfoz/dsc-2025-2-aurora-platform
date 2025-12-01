@@ -1,0 +1,62 @@
+name: create-release-deploy-bundle
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  packages: read
+  issues: write
+  checks: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare bundle files
+        id: prepare
+        run: |
+          OWNER=${GITHUB_REPOSITORY_OWNER}
+          SHA_SHORT=$(echo ${GITHUB_SHA} | cut -c1-7)
+          BUNDLE_DIR=deploy-bundle-${SHA_SHORT}
+          mkdir -p ${BUNDLE_DIR}
+
+          # create resolved docker-compose.deploy.yml (replace placeholders)
+          sed "s|REPO_OWNER|${OWNER}|g; s|\${USERS_IMAGE_TAG:-latest}|sha-${SHA_SHORT}|g; s|\${AUTH_IMAGE_TAG:-latest}|sha-${SHA_SHORT}|g; s|\${EVENTS_IMAGE_TAG:-latest}|sha-${SHA_SHORT}|g" docker-compose.deploy.yml > ${BUNDLE_DIR}/docker-compose.deploy.yml
+
+          # include example env, postgres-init, and README-deploy
+          cp .env.prod.example ${BUNDLE_DIR}/.env.prod.example || true
+          if [ -d postgres-init ]; then
+            cp -r postgres-init ${BUNDLE_DIR}/
+          fi
+          cp README-deploy.md ${BUNDLE_DIR}/README-deploy.md || true
+
+          # pack it
+          tar -czf deploy-bundle-${SHA_SHORT}.tar.gz -C ${BUNDLE_DIR} .
+          echo "bundle=deploy-bundle-${SHA_SHORT}.tar.gz" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: deploy-bundle-${{ github.sha }}
+          release_name: Deploy bundle for ${{ github.sha }}
+          body: |
+            Release bundle containing a deploy-only docker-compose, env example, postgres-init and README for operations.
+          draft: false
+          prerelease: false
+
+      - name: Upload release bundle
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.prepare.outputs.bundle }}
+          asset_name: ${{ steps.prepare.outputs.bundle }}
+          asset_content_type: application/gzip
+
+      - name: Output release URL
+        run: echo "Release created - ${{ steps.create_release.outputs.html_url }}"
