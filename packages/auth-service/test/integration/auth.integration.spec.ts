@@ -40,7 +40,7 @@ describe('Auth provider integration (minimal)', () => {
     const res = await request(app.getHttpServer())
       .post('/auth/refresh')
       .send({ refreshToken: 'invalid-token' });
-    
+
     // Either 400 (validation) or 401 (auth) is acceptable
     expect([400, 401]).toContain(res.status);
   });

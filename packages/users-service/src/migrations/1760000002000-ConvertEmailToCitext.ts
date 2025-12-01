@@ -2,10 +2,13 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class ConvertEmailToCitext1760000002000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // ensure extension exists in DB
-    await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS citext;`);
+    // ensure extension exists in public schema (accessible from all schemas)
+    await queryRunner.query(
+      `CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public;`,
+    );
 
     // alter column type to citext in the users schema
+    // search_path now includes public schema, so citext type is found
     await queryRunner.query(`
       ALTER TABLE users.users
       ALTER COLUMN email TYPE citext USING email::citext;

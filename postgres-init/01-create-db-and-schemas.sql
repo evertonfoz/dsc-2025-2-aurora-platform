@@ -4,6 +4,10 @@
 -- Note: docker-compose already sets POSTGRES_DB=aurora_db, so the database is created automatically.
 -- We connect to it directly (scripts in /docker-entrypoint-initdb.d run against POSTGRES_DB by default).
 
+-- Enable citext extension (required for case-insensitive email)
+-- Must be created before schemas so it's available database-wide
+CREATE EXTENSION IF NOT EXISTS citext;
+
 -- Create schemas for each microservice
 CREATE SCHEMA IF NOT EXISTS events AUTHORIZATION postgres;
 CREATE SCHEMA IF NOT EXISTS users AUTHORIZATION postgres;

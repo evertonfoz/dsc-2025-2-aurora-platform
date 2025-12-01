@@ -5,6 +5,8 @@ import { AuthModule } from './auth.module';
 
 config();
 
+const schema = process.env.DB_SCHEMA ?? 'auth';
+
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -14,13 +16,14 @@ config();
       username: process.env.DB_USER ?? 'postgres',
       password: process.env.DB_PASS ?? 'postgres',
       database: process.env.DB_NAME ?? 'aurora_db',
-      schema: process.env.DB_SCHEMA ?? 'auth',
+      schema,
       entities: [__dirname + '/**/*.entity.{ts,js}'],
       migrations: [__dirname + '/migrations/*.{ts,js}'],
       migrationsRun: true,
       synchronize: false,
       logging: process.env.DB_LOGGING === 'true',
-      extra: { options: `-c search_path=${process.env.DB_SCHEMA ?? 'auth'}` },
+      // Include public schema in search_path for extensions
+      extra: { options: `-c search_path=${schema},public` },
     }),
     AuthModule,
   ],
