@@ -110,7 +110,7 @@ export class UsersController {
 
   @Patch(':id/last-logout')
   @ApiOperation({ summary: 'Set last logout timestamp for user' })
-  @UseGuards(ServiceAndJwtGuard, RolesGuard)
+  @UseGuards(ServiceTokenGuard)
   async setLastLogout(@Param('id') id: string) {
     // set it to now
     return this.usersService.setLastLogoutAt(id, new Date());
@@ -120,21 +120,8 @@ export class UsersController {
   @ApiOperation({ summary: 'Get user by id' })
   @ApiResponse({ status: 200, description: 'User found', type: UserDto })
   @ApiResponse({ status: 404, description: 'User not found' })
-  @UseGuards(ServiceAndJwtGuard, RolesGuard)
-  async getById(
-    @Param('id') id: string,
-    @OwnerId() requesterId?: number,
-    @Req() req?: any,
-  ) {
-    const authUser = req?.user as unknown as { roles?: string[] } | undefined;
-    const isAdmin =
-      Array.isArray(authUser?.roles) && authUser!.roles!.includes('admin');
-    return this.usersService.findOne(
-      id,
-      requesterId == null ? undefined : { id: requesterId, isAdmin },
-    );
+  @UseGuards(ServiceTokenGuard)
+  async getById(@Param('id') id: string) {
+    return this.usersService.findOne(id);
   }
-
-  // NOTE: internal unauthenticated endpoint removed. Service-to-service calls
-  // should use a service token validated by ServiceTokenGuard for security.
 }

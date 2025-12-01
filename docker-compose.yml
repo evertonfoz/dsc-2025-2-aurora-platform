@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:16
-    container_name: aurora_db
+    container_name: aurora-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -24,7 +24,7 @@ services:
     build:
       context: .
       dockerfile: ./packages/events-service/Dockerfile
-    container_name: aurora_events_service
+    container_name: aurora-events
     restart: unless-stopped
     ports:
       - '3012:3012'
@@ -52,7 +52,7 @@ services:
     build:
       context: .
       dockerfile: ./packages/auth-service/Dockerfile
-    container_name: aurora_auth_service
+    container_name: aurora-auth
     restart: unless-stopped
     ports:
       - '3010:3010'
@@ -81,7 +81,7 @@ services:
     build:
       context: .
       dockerfile: ./packages/users-service/Dockerfile
-    container_name: aurora_users_service
+    container_name: aurora-users
     restart: unless-stopped
     ports:
       - '3011:3011'

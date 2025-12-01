@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   db:
+    container_name: aurora-db-deploy
     image: postgres:16
     restart: unless-stopped
     env_file:
@@ -23,6 +24,7 @@ services:
 
   users-service:
     # IMAGEM: troque USER_ORG/REPO e TAG se necessário (ex.: ghcr.io/my-org/users-service:sha-<commit>)
+    container_name: aurora-users-deploy
     image: ghcr.io/REPO_OWNER/users-service:${USERS_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
@@ -45,6 +47,7 @@ services:
       - aurora_network
 
   auth-service:
+    container_name: aurora-auth-deploy
     image: ghcr.io/REPO_OWNER/auth-service:${AUTH_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
@@ -71,6 +74,7 @@ services:
       - aurora_network
 
   events-service:
+    container_name: aurora-events-deploy
     image: ghcr.io/REPO_OWNER/events-service:${EVENTS_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
