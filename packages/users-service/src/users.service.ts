@@ -35,19 +35,22 @@ export class UsersService implements OnModuleInit {
     // ensure two seeded users for backward compatibility with auth-service tests
     const adminEmail = 'admin.user@example.com';
     const testEmail = 'test.user@example.com';
+    const pepper = process.env.HASH_PEPPER ?? '';
 
     const existingAdmin = await this.repo.findOne({
       where: { email: ILike(adminEmail) } as any,
     });
     if (!existingAdmin) {
       const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash('AdminP@ss1', salt);
+      const passwordHash = await bcrypt.hash('AdminP@ss1' + pepper, salt);
       const admin = this.repo.create({
         name: 'Admin User',
         email: adminEmail,
         passwordHash,
+        role: 'admin',
       } as any);
       await this.repo.save(admin);
+      console.log('[UsersService] Seeded admin user: admin.user@example.com');
     }
 
     const existingTest = await this.repo.findOne({
@@ -55,13 +58,15 @@ export class UsersService implements OnModuleInit {
     });
     if (!existingTest) {
       const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash('StrongP@ssw0rd', salt);
+      const passwordHash = await bcrypt.hash('StrongP@ssw0rd' + pepper, salt);
       const testUser = this.repo.create({
         name: 'Test User',
         email: testEmail,
         passwordHash,
+        role: 'student',
       } as any);
       await this.repo.save(testUser);
+      console.log('[UsersService] Seeded test user: test.user@example.com');
     }
   }
 

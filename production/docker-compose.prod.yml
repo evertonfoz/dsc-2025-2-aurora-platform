@@ -1,0 +1,119 @@
+version: '3.8'
+
+# NOTA: Este arquivo é destinado a um ambiente de produção real com domínio e SSL.
+# Ele assume que você terá um .env.prod na raiz do projeto com as variáveis de ambiente.
+
+services:
+  #----------------------------------------------------------------
+  # SERVIÇOS DA APLICAÇÃO (BACKEND)
+  # - Não expõem portas, o acesso é feito via Nginx.
+  # - Usam imagens prontas do GHCR.
+  #----------------------------------------------------------------
+  db:
+    image: postgres:16
+    container_name: aurora-db-prod
+    restart: unless-stopped
+    env_file:
+      - ../.env.prod # Carrega a partir da raiz do projeto
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+      - ../postgres-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aurora_network
+
+  users-service:
+    image: ghcr.io/${REPO_OWNER}/users-service:$${USERS_IMAGE_TAG:-latest}
+    container_name: aurora-users-prod
+    restart: unless-stopped
+    env_file:
+      - ../.env.prod
+    environment:
+      - NODE_ENV=production
+      - PORT=3011
+      - DB_SCHEMA=users
+      - DB_HOST=db
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - aurora_network
+
+  auth-service:
+    image: ghcr.io/${REPO_OWNER}/auth-service:$${AUTH_IMAGE_TAG:-latest}
+    container_name: aurora-auth-prod
+    restart: unless-stopped
+    env_file:
+      - ../.env.prod
+    environment:
+      - NODE_ENV=production
+      - PORT=3010
+      - DB_SCHEMA=auth
+      - DB_HOST=db
+      - USERS_API_URL=http://users-service:3011
+    depends_on:
+      db:
+        condition: service_healthy
+      users-service:
+        condition: service_started
+    networks:
+      - aurora_network
+
+  events-service:
+    image: ghcr.io/${REPO_OWNER}/events-service:$${EVENTS_IMAGE_TAG:-latest}
+    container_name: aurora-events-prod
+    restart: unless-stopped
+    env_file:
+      - ../.env.prod
+    environment:
+      - NODE_ENV=production
+      - PORT=3012
+      - DB_SCHEMA=events
+      - DB_HOST=db
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - aurora_network
+
+  #----------------------------------------------------------------
+  # INFRAESTRUTURA DE BORDA (NGINX + SSL)
+  #----------------------------------------------------------------
+  nginx:
+    image: nginx:1.25
+    container_name: aurora-nginx-prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+      - certbot_data:/etc/letsencrypt
+    depends_on:
+      - users-service
+      - auth-service
+      - events-service
+    networks:
+      - aurora_network
+
+  certbot:
+    image: certbot/certbot
+    container_name: aurora-certbot-prod
+    # O Certbot só precisa rodar para obter/renovar o certificado.
+    # O comando `renew` é executado periodicamente.
+    command: renew
+    volumes:
+      - certbot_data:/etc/letsencrypt
+      - ./nginx:/etc/nginx/conf.d
+
+volumes:
+  pgdata_prod:
+  certbot_data:
+
+networks:
+  aurora_network:
+    driver: bridge
