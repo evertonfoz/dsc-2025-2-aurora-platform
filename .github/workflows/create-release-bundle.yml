@@ -26,10 +26,13 @@ jobs:
           # create resolved docker-compose.deploy.yml (replace placeholders)
           sed "s|REPO_OWNER|${OWNER}|g; s|\${USERS_IMAGE_TAG:-latest}|sha-${SHA_SHORT}|g; s|\${AUTH_IMAGE_TAG:-latest}|sha-${SHA_SHORT}|g; s|\${EVENTS_IMAGE_TAG:-latest}|sha-${SHA_SHORT}|g" docker-compose.deploy.yml > ${BUNDLE_DIR}/docker-compose.deploy.yml
 
-          # include example env, postgres-init, and README-deploy
+          # include example env, postgres-init, https files and README-deploy
           cp .env.prod.example ${BUNDLE_DIR}/.env.prod.example || true
           if [ -d postgres-init ]; then
             cp -r postgres-init ${BUNDLE_DIR}/
+          fi
+          if [ -d https ]; then
+            cp -r https ${BUNDLE_DIR}/
           fi
           cp README-deploy.md ${BUNDLE_DIR}/README-deploy.md || true
 

@@ -68,8 +68,8 @@ function health() {
 }
 
 echo "Testando endpoints de health (localhost:3010/3011/3012)"
-health http://localhost:3010/health || true
-health http://localhost:3011/health || true
+health http://localhost:3010/auth/me || echo "  (401 esperado - auth requer token)"
+health http://localhost:3011/users/health || true
 health http://localhost:3012/health || true
 
 echo "Deploy concluído (verificar logs e métricas)."

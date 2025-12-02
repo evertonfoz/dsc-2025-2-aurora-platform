@@ -1,0 +1,52 @@
+# .github/workflows/deploy-to-vps.yml
+# Este workflow é responsável por fazer o deploy dos serviços em uma VPS.
+# Ele é acionado APÓS a conclusão bem-sucedida dos workflows de build,
+# garantindo que as imagens Docker já foram publicadas no GHCR.
+
+name: Deploy to VPS
+
+on:
+  workflow_run:
+    # Lista dos workflows que, ao terminarem, acionarão este deploy.
+    workflows: ["build-auth-service", "build-users-service", "build-events-service"]
+    types:
+      - completed
+    branches: [main]
+
+jobs:
+  deploy:
+    # Executa o deploy apenas se o workflow que o acionou (o 'build') foi bem-sucedido.
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            # Navega para o diretório do projeto na VPS
+            # Certifique-se de que este caminho está correto no seu servidor.
+            cd /home/ubuntu/dsc-2025-2-aurora-platform
+            
+            # Garante que o repositório local está atualizado com a branch main
+            git checkout main
+            git pull origin main
+            
+            # Carrega as variáveis de ambiente do arquivo .env.prod
+            export $(grep -v '^#' .env.prod | xargs)
+            
+            # Faz o login no GitHub Container Registry
+            echo ${{ secrets.GH_PAT }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+            
+            # Baixa as imagens mais recentes definidas no docker-compose.deploy.yml
+            docker compose -f docker-compose.deploy.yml pull
+            
+            # Reinicia os serviços para usar as novas imagens
+            docker compose -f docker-compose.deploy.yml up -d
