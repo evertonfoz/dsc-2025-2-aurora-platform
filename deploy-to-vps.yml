@@ -32,8 +32,9 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             # Navega para o diretório do projeto na VPS
-            # Certifique-se de que este caminho está correto no seu servidor.
-            cd /home/ubuntu/dsc-2025-2-aurora-platform
+            # Use o segredo `VPS_PROJECT_DIR` para tornar o caminho configurável.
+            # Defina esse segredo em: Settings > Secrets and variables > Actions
+            cd /home/ubuntu/${{ secrets.VPS_PROJECT_DIR }}
             
             # Garante que o repositório local está atualizado com a branch main
             git checkout main
