@@ -9,6 +9,7 @@ Este documento descreve o processo de configuração de uma máquina virtual (VM
 - [Parte 2: Configuração dos Segredos no GitHub](#parte-2-configuração-dos-segredos-no-github)
 - [Parte 3: Preparação Inicial da VPS](#parte-3-preparação-inicial-da-vps)
 - [Parte 4: Configuração do Arquivo `.env.prod`](#parte-4-configuração-do-arquivo-envprod)
+- [Parte 4.5: Teste Local (Máquina de Desenvolvimento)](#parte-45-teste-local-máquina-de-desenvolvimento)
 - [Parte 5: Primeiro Deploy e Validação](#parte-5-primeiro-deploy-e-validação)
 - [Parte 6: Troubleshooting - Problemas Comuns](#parte-6-troubleshooting---problemas-comuns)
 
@@ -561,6 +562,163 @@ grep -E "^[A-Z_]+=" .env.prod | cut -d'=' -f1
 ```
 
 > ⚠️ **IMPORTANTE**: Nunca commite o arquivo `.env.prod` no Git. Ele já está no `.gitignore`.
+
+---
+
+## Parte 4.5: Teste Local (Máquina de Desenvolvimento)
+
+Antes de fazer deploy na VPS, é recomendado testar a stack Docker localmente (no seu Mac ou PC de desenvolvimento). Isso ajuda a identificar problemas de configuração antes de subir para produção.
+
+### Pré-requisitos
+
+- Docker Desktop instalado e rodando
+- Arquivo `.env.prod` preenchido no root do repositório
+- Login no GHCR (se as imagens forem privadas)
+
+### 1. Criar/verificar o arquivo `.env.prod`
+
+Crie o arquivo `.env.prod` no root do repositório com as variáveis necessárias:
+
+```bash
+# Exemplo mínimo de .env.prod para teste local
+NODE_ENV=production
+
+# Postgres
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=SuaSenhaSegura123!
+POSTGRES_DB=aurora_db
+
+# App DB connection
+DB_HOST=db
+DB_PORT=5432
+DB_USER=postgres
+DB_PASS=SuaSenhaSegura123!
+DB_NAME=aurora_db
+DB_SSL=false
+DB_LOGGING=false
+
+# GitHub Container Registry
+REPO_OWNER=evertonfoz
+USERS_IMAGE_TAG=latest
+AUTH_IMAGE_TAG=latest
+EVENTS_IMAGE_TAG=latest
+
+# JWT
+JWT_ACCESS_SECRET=SeuSegredoJwtAqui
+JWT_REFRESH_SECRET=SeuSegredoRefreshAqui
+
+# Service token
+SERVICE_TOKEN=SeuServiceTokenAqui
+HASH_PEPPER=
+
+# URLs internas (docker network)
+USERS_API_URL=http://users-service:3011
+```
+
+### 2. Login no GHCR (se imagens privadas)
+
+```bash
+export GH_PAT="<SEU_GH_PAT>"
+echo -n "$GH_PAT" | docker login ghcr.io -u evertonfoz --password-stdin
+unset GH_PAT
+```
+
+### 3. Baixar imagens e subir serviços
+
+⚠️ **Importante:** Use `--env-file .env.prod` para carregar as variáveis corretamente:
+
+```bash
+# Validar o docker-compose (dry-run)
+docker compose --env-file .env.prod -f docker-compose.deploy.yml config
+
+# Baixar imagens
+docker compose --env-file .env.prod -f docker-compose.deploy.yml pull
+
+# Subir serviços
+docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d
+```
+
+### 4. Verificar status
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.deploy.yml ps
+```
+
+Saída esperada:
+```
+NAME                   STATUS                    PORTS
+aurora-auth-deploy     Up X seconds              0.0.0.0:3010->3010/tcp
+aurora-db-deploy       Up X minutes (healthy)    5432/tcp
+aurora-events-deploy   Up X seconds              0.0.0.0:3012->3012/tcp
+aurora-users-deploy    Up X seconds              0.0.0.0:3011->3011/tcp
+```
+
+### 5. Testar endpoints de health
+
+```bash
+# users-service
+curl http://localhost:3011/users/health
+
+# events-service
+curl http://localhost:3012/health
+
+# Swagger docs (abrir no navegador)
+open http://localhost:3011/docs
+open http://localhost:3012/docs
+```
+
+### 6. Ver logs
+
+```bash
+# Todos os serviços
+docker compose --env-file .env.prod -f docker-compose.deploy.yml logs -f
+
+# Serviço específico
+docker compose --env-file .env.prod -f docker-compose.deploy.yml logs -f users-service
+```
+
+### 7. Parar serviços
+
+```bash
+# Parar (preserva volumes/dados)
+docker compose --env-file .env.prod -f docker-compose.deploy.yml down
+
+# Parar E remover volumes (reseta banco)
+docker compose --env-file .env.prod -f docker-compose.deploy.yml down -v
+```
+
+### Problemas comuns no teste local
+
+#### Erro: `invalid reference format`
+
+**Causa:** Variáveis como `REPO_OWNER` não estão definidas, gerando nomes de imagem inválidos (ex: `ghcr.io//users-service:latest`).
+
+**Solução:** Use `--env-file .env.prod` em todos os comandos `docker compose`, ou exporte as variáveis no shell:
+
+```bash
+export REPO_OWNER=evertonfoz
+docker compose -f docker-compose.deploy.yml pull
+```
+
+#### Erro: `password authentication failed for user "postgres"`
+
+**Causa:** O volume do PostgreSQL foi criado com uma senha diferente da atual no `.env.prod`.
+
+**Solução:** Remover o volume e recriar (apaga dados do banco local):
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.deploy.yml down -v
+docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d
+```
+
+#### Containers reiniciando em loop
+
+**Diagnóstico:**
+```bash
+docker compose --env-file .env.prod -f docker-compose.deploy.yml logs --tail 50
+```
+
+Procure por erros de conexão com banco ou variáveis faltando.
 
 ---
 
