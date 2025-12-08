@@ -74,6 +74,40 @@ Se, após a criação, a instância aparecer com "Public IP address: -", siga es
 5.  Na janela que abrir, em "Public IP Type", selecione **"Ephemeral public IP"**.
 6.  Clique em **Update**.
 
+### 4. Configurar Security List (Liberar Portas dos Serviços)
+
+Por padrão, a Oracle Cloud bloqueia todo o tráfego de entrada, exceto SSH (porta 22). Para acessar os serviços da Aurora Platform externamente, você precisa liberar as portas 3010-3012 na Security List da VCN.
+
+#### Passo a passo:
+
+1.  No painel da Oracle Cloud, vá em **Networking** → **Virtual cloud networks**.
+2.  Clique na VCN da sua instância (ex: `vcn-aurora-project`).
+3.  No menu lateral ou na lista de recursos, clique em **Security Lists**.
+4.  Clique na security list padrão (ex: `Default Security List for vcn-aurora-project`).
+5.  Na aba **Ingress Rules**, clique em **Add Ingress Rules**.
+6.  Preencha os campos:
+
+| Campo | Valor |
+|-------|-------|
+| **Stateless** | Não (deixe desmarcado) |
+| **Source Type** | CIDR |
+| **Source CIDR** | `0.0.0.0/0` |
+| **IP Protocol** | TCP |
+| **Source Port Range** | (deixe vazio - All) |
+| **Destination Port Range** | `3010-3012` |
+| **Description** | `Aurora Platform Services (auth, users, events)` |
+
+7.  Clique em **Add Ingress Rules**.
+
+> **Nota de Segurança:** Em produção real, considere restringir o `Source CIDR` para IPs específicos ou usar um Load Balancer/API Gateway.
+
+#### Verificação
+
+Após adicionar a regra, você deve ter 4 regras de Ingress:
+- TCP porta 22 (SSH)
+- TCP portas 3010-3012 (Aurora Platform)
+- ICMP (diagnósticos de rede)
+
 ---
 
 ## Parte 2: Configuração dos Segredos no GitHub
@@ -790,6 +824,46 @@ curl http://localhost:3012/health
 curl -s -o /dev/null -w "HTTP %{http_code}" http://localhost:3010/auth/login
 # Esperado: HTTP 400 ou 401 (endpoint existe mas precisa de credenciais)
 ```
+
+### 7. Testar acesso externo (do seu computador local)
+
+Após configurar a Security List da Oracle Cloud (Parte 1, seção 4), você pode testar o acesso externo diretamente do seu computador:
+
+```bash
+# Substitua <IP_VPS> pelo IP público da sua instância
+# Exemplo: 64.181.173.121
+
+# users-service
+curl http://<IP_VPS>:3011/users/health
+# Esperado: {"status":"ok"}
+
+# events-service
+curl http://<IP_VPS>:3012/health
+# Esperado: {"status":"ok"}
+
+# auth-service - testar login (sem credenciais)
+curl -s -o /dev/null -w "HTTP %{http_code}" http://<IP_VPS>:3010/auth/login
+# Esperado: HTTP 400 ou 404 (endpoint existe)
+
+# auth-service - testar login com credenciais
+curl -X POST http://<IP_VPS>:3010/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@aurora.com", "password": "SuaSenhaAqui"}'
+# Esperado: JSON com access_token e refresh_token
+```
+
+> **Se o teste externo falhar com timeout:**
+> 1. Verifique se a Security List está configurada (Parte 1, seção 4)
+> 2. Verifique se o iptables da VPS tem as portas abertas:
+>    ```bash
+>    ssh ubuntu@<IP_VPS> "sudo iptables -L INPUT -n | grep -E '301[0-2]'"
+>    ```
+> 3. Se necessário, abra as portas no iptables:
+>    ```bash
+>    ssh ubuntu@<IP_VPS> "sudo iptables -I INPUT 5 -p tcp --dport 3010 -j ACCEPT && \
+>      sudo iptables -I INPUT 5 -p tcp --dport 3011 -j ACCEPT && \
+>      sudo iptables -I INPUT 5 -p tcp --dport 3012 -j ACCEPT"
+>    ```
 
 ---
 
