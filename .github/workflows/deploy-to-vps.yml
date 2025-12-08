@@ -35,9 +35,9 @@ jobs:
           key: ${{ secrets.VPS_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
+            set -e
+            
             # Navega para o diretório do projeto na VPS
-            # Use o segredo `VPS_PROJECT_DIR` para tornar o caminho configurável.
-            # Defina esse segredo em: Settings > Secrets and variables > Actions
             cd /home/ubuntu/${{ secrets.VPS_PROJECT_DIR }}
             
             # Garante que o repositório local está atualizado com a branch main
@@ -45,13 +45,18 @@ jobs:
             git pull origin main
             
             # Carrega as variáveis de ambiente do arquivo .env.prod
-            export $(grep -v '^#' .env.prod | xargs)
+            set -o allexport
+            source .env.prod
+            set +o allexport
             
-            # Faz o login no GitHub Container Registry
-            echo ${{ secrets.GH_PAT }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+            # Faz o login no GitHub Container Registry usando GH_PAT do .env.prod
+            echo "$GH_PAT" | docker login ghcr.io -u evertonfoz --password-stdin
             
             # Baixa as imagens mais recentes definidas no docker-compose.deploy.yml
-            docker compose -f docker-compose.deploy.yml pull
+            docker compose --env-file .env.prod -f docker-compose.deploy.yml pull
             
             # Reinicia os serviços para usar as novas imagens
-            docker compose -f docker-compose.deploy.yml up -d
+            docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d
+            
+            # Verifica status
+            docker compose --env-file .env.prod -f docker-compose.deploy.yml ps
