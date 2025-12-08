@@ -2,6 +2,21 @@
 
 Abaixo estão os comandos prontos que você pode executar localmente e na VPS já com os valores reais do seu ambiente (`evertonfoz/dsc-2025-2-aurora-platform`, VPS IP `64.181.173.121`, usuário `ubuntu`, diretório `dsc-2025-2-aurora-platform`). Substitua apenas `<GH_PAT>` pelo seu token quando indicado.
 
+**Checklist rápido — Teste local do deploy (VPS)**
+
+- Conectar via SSH ao servidor `ubuntu@64.181.173.121`.
+- Garantir que o diretório `/home/ubuntu/dsc-2025-2-aurora-platform` contém o repositório e o arquivo `.env.prod`.
+- Gerar/usar uma chave dedicada (`~/.ssh/aurora_deploy`) e registrar os `Secrets` no GitHub (`VPS_HOST`, `VPS_PRIVATE_KEY`, `GH_PAT`, `VPS_PROJECT_DIR`).
+- Rodar o script helper na VPS para checagens e deploy:
+
+```bash
+cd /home/ubuntu/dsc-2025-2-aurora-platform
+chmod +x scripts/run-deploy-test.sh
+./scripts/run-deploy-test.sh --dir dsc-2025-2-aurora-platform --deploy
+```
+
+Esses passos reproduzem o fluxo do workflow `deploy-to-vps.yml` e são úteis para validar tudo localmente antes de acionar o CI.
+
 ## 1) Criar os secrets no GitHub (execute localmente)
 
 ```bash

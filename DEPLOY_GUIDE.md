@@ -267,6 +267,22 @@ sudo chown ubuntu:ubuntu /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
 
 Antes de acionar o workflow `deploy-to-vps.yml`, é uma boa prática executar manualmente os mesmos comandos na VPS para validar configurações e evitar falhas no CI. Siga estes passos **como usuário `ubuntu`** na VPS.
 
+**Checklist rápido — Teste local do deploy (VPS)**
+
+- **1.** Conecte-se à VPS via SSH como `ubuntu`.
+- **2.** Confirme que `/home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>` existe e contém o repositório.
+- **3.** Verifique presença de `.env.prod` e `docker-compose.deploy.yml`.
+- **4.** Faça login no GHCR com `GH_PAT` temporário e teste `docker login ghcr.io`.
+- **5.** Execute o script helper para checagens e (opcional) deploy:
+
+```bash
+cd /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
+chmod +x scripts/run-deploy-test.sh
+./scripts/run-deploy-test.sh --dir <SEU_DIRETORIO_DO_PROJETO> --deploy
+```
+
+Siga a sequência acima antes de acionar o workflow automático; ela reproduz o que o CI fará e facilita resolução de problemas locais.
+
 1) Conectar na VPS (exemplo):
 
 ```bash
