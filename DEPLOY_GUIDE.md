@@ -2,11 +2,32 @@
 
 Este documento descreve o processo de configuração de uma máquina virtual (VM) na Oracle Cloud Infrastructure (OCI) e a configuração dos segredos necessários no GitHub para habilitar o deploy contínuo (CD) da aplicação Aurora Platform.
 
+## Índice
+
+- [Visão Geral do Processo](#visão-geral-do-processo)
+- [Parte 1: Configuração da Instância na Oracle Cloud (VPS)](#parte-1-configuração-da-instância-na-oracle-cloud-vps)
+- [Parte 2: Configuração dos Segredos no GitHub](#parte-2-configuração-dos-segredos-no-github)
+- [Parte 3: Preparação Inicial da VPS](#parte-3-preparação-inicial-da-vps)
+- [Parte 4: Configuração do Arquivo `.env.prod`](#parte-4-configuração-do-arquivo-envprod)
+- [Parte 5: Primeiro Deploy e Validação](#parte-5-primeiro-deploy-e-validação)
+- [Parte 6: Troubleshooting - Problemas Comuns](#parte-6-troubleshooting---problemas-comuns)
+
+---
+
 ## Visão Geral do Processo
 
 O pipeline de CI/CD funciona em duas etapas principais:
 1.  **CI (Integração Contínua):** Workflows (`build-*.yml`) constroem as imagens Docker de cada microsserviço e as publicam no GitHub Container Registry (GHCR) a cada push na branch `main`.
 2.  **CD (Deploy Contínuo):** Um workflow (`deploy-to-vps.yml`) é acionado após a conclusão bem-sucedida dos workflows de build. Ele se conecta à VPS via SSH, atualiza o repositório, baixa as novas imagens do GHCR e reinicia os serviços usando `docker-compose`.
+
+### Arquitetura dos Serviços
+
+| Serviço | Porta | Descrição |
+|---------|-------|-----------|
+| `auth-service` | 3010 | Autenticação (login, logout, refresh token) |
+| `users-service` | 3011 | Gerenciamento de usuários |
+| `events-service` | 3012 | Gerenciamento de eventos |
+| `db` (PostgreSQL) | 5432 | Banco de dados compartilhado com schemas separados |
 
 ---
 
@@ -246,6 +267,22 @@ sudo chown ubuntu:ubuntu /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
 
 Antes de acionar o workflow `deploy-to-vps.yml`, é uma boa prática executar manualmente os mesmos comandos na VPS para validar configurações e evitar falhas no CI. Siga estes passos **como usuário `ubuntu`** na VPS.
 
+**Checklist rápido — Teste local do deploy (VPS)**
+
+- **1.** Conecte-se à VPS via SSH como `ubuntu`.
+- **2.** Confirme que `/home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>` existe e contém o repositório.
+- **3.** Verifique presença de `.env.prod` e `docker-compose.deploy.yml`.
+- **4.** Faça login no GHCR com `GH_PAT` temporário e teste `docker login ghcr.io`.
+- **5.** Execute o script helper para checagens e (opcional) deploy:
+
+```bash
+cd /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
+chmod +x scripts/run-deploy-test.sh
+./scripts/run-deploy-test.sh --dir <SEU_DIRETORIO_DO_PROJETO> --deploy
+```
+
+Siga a sequência acima antes de acionar o workflow automático; ela reproduz o que o CI fará e facilita resolução de problemas locais.
+
 1) Conectar na VPS (exemplo):
 
 ```bash
@@ -426,3 +463,367 @@ ssh -T git@github.com
 Aviso: copiar chaves privadas é arriscado — prefira gerar um par de chaves exclusivo na VPS ou usar *Deploy Key*.
 ```
 **Importante:** Após executar `sudo usermod -aG docker ${USER}`, você precisa **sair da sessão SSH e reconectar** para que a permissão tenha efeito.
+
+---
+
+## Parte 4: Configuração do Arquivo `.env.prod`
+
+O arquivo `.env.prod` contém todas as variáveis de ambiente necessárias para o deploy. Este arquivo **NÃO deve ser commitado no repositório** por conter senhas e tokens sensíveis.
+
+### 1. Criar o arquivo `.env.prod` na VPS
+
+Conecte-se à VPS e crie o arquivo:
+
+```bash
+ssh -i ~/.ssh/id_rsa ubuntu@<SEU_VPS_HOST>
+cd /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
+nano .env.prod
+```
+
+### 2. Conteúdo do `.env.prod`
+
+Cole o seguinte conteúdo, substituindo os valores entre `< >`:
+
+```bash
+# ============================================
+# CONFIGURAÇÃO DO BANCO DE DADOS (PostgreSQL)
+# ============================================
+POSTGRES_USER=aurora_user
+POSTGRES_DB=aurora_db
+POSTGRES_PASSWORD=<SENHA_FORTE_AQUI>
+
+# ============================================
+# CONFIGURAÇÃO DO REPOSITÓRIO (GHCR)
+# ============================================
+REPO_OWNER=<SEU_USUARIO_GITHUB>
+GH_PAT=<SEU_PERSONAL_ACCESS_TOKEN>
+
+# ============================================
+# CONFIGURAÇÃO DE SEGURANÇA (JWT)
+# ============================================
+JWT_ACCESS_SECRET=<CHAVE_SECRETA_JWT_AQUI>
+JWT_EXPIRES_IN=15m
+
+# ============================================
+# CONFIGURAÇÃO INTER-SERVIÇOS
+# ============================================
+SERVICE_TOKEN=<TOKEN_COMUNICACAO_SERVICOS>
+
+# ============================================
+# OPCIONAL: HASH PEPPER (segurança adicional para senhas)
+# ============================================
+HASH_PEPPER=<VALOR_OPCIONAL>
+
+# ============================================
+# TAGS DAS IMAGENS (opcional - padrão: latest)
+# ============================================
+# AUTH_IMAGE_TAG=latest
+# USERS_IMAGE_TAG=latest
+# EVENTS_IMAGE_TAG=latest
+```
+
+### 3. Gerar senhas e tokens seguros
+
+Use os comandos abaixo para gerar valores seguros:
+
+```bash
+# Gerar POSTGRES_PASSWORD (48 caracteres hexadecimais)
+openssl rand -hex 24
+
+# Gerar JWT_ACCESS_SECRET (64 caracteres hexadecimais)
+openssl rand -hex 32
+
+# Gerar SERVICE_TOKEN (32 caracteres hexadecimais)
+openssl rand -hex 16
+```
+
+### 4. Proteger o arquivo
+
+```bash
+chmod 600 .env.prod
+```
+
+### 5. Verificar se o arquivo está correto
+
+```bash
+# Listar variáveis (sem mostrar valores sensíveis)
+grep -E "^[A-Z_]+=" .env.prod | cut -d'=' -f1
+
+# Deve mostrar:
+# POSTGRES_USER
+# POSTGRES_DB
+# POSTGRES_PASSWORD
+# REPO_OWNER
+# GH_PAT
+# JWT_ACCESS_SECRET
+# JWT_EXPIRES_IN
+# SERVICE_TOKEN
+```
+
+> ⚠️ **IMPORTANTE**: Nunca commite o arquivo `.env.prod` no Git. Ele já está no `.gitignore`.
+
+---
+
+## Parte 5: Primeiro Deploy e Validação
+
+### 1. Exportar variáveis de ambiente
+
+```bash
+cd /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
+export $(grep -v '^#' .env.prod | xargs)
+```
+
+### 2. Login no GitHub Container Registry
+
+```bash
+echo "$GH_PAT" | docker login ghcr.io -u $REPO_OWNER --password-stdin
+```
+
+Você deve ver: `Login Succeeded`
+
+### 3. Baixar imagens e iniciar serviços
+
+```bash
+docker compose -f docker-compose.deploy.yml pull
+docker compose -f docker-compose.deploy.yml up -d
+```
+
+### 4. Verificar status dos containers
+
+```bash
+docker compose -f docker-compose.deploy.yml ps
+```
+
+Saída esperada (todos com status `Up`):
+```
+NAME                   STATUS                    PORTS
+aurora-auth-deploy     Up X seconds              0.0.0.0:3010->3010/tcp
+aurora-db-deploy       Up X minutes (healthy)    5432/tcp
+aurora-events-deploy   Up X seconds              0.0.0.0:3012->3012/tcp
+aurora-users-deploy    Up X seconds              0.0.0.0:3011->3011/tcp
+```
+
+### 5. Verificar logs dos serviços
+
+```bash
+# Ver logs de todos os serviços
+docker compose -f docker-compose.deploy.yml logs --tail 50
+
+# Ver logs de um serviço específico
+docker compose -f docker-compose.deploy.yml logs --tail 30 users-service
+```
+
+Procure por mensagens de sucesso como:
+- `Nest application successfully started`
+- `listening on port 30XX`
+
+### 6. Testar endpoints de health
+
+```bash
+# users-service
+curl http://localhost:3011/users/health
+# Esperado: {"status":"ok"}
+
+# events-service
+curl http://localhost:3012/health
+# Esperado: {"status":"ok"}
+
+# auth-service (testar se responde)
+curl -s -o /dev/null -w "HTTP %{http_code}" http://localhost:3010/auth/login
+# Esperado: HTTP 400 ou 401 (endpoint existe mas precisa de credenciais)
+```
+
+---
+
+## Parte 6: Troubleshooting - Problemas Comuns
+
+### Problema 1: "password authentication failed for user"
+
+**Sintoma:** Os serviços NestJS falham ao conectar no banco com erro:
+```
+error: password authentication failed for user "aurora_user"
+```
+
+**Causa:** O volume do PostgreSQL foi inicializado com uma senha diferente da atual no `.env.prod`.
+
+**Solução A - Resetar a senha no banco (preserva dados):**
+
+```bash
+# Conectar no container do banco
+docker exec -it aurora-db-deploy bash
+
+# Dentro do container, conectar no psql
+psql -U $POSTGRES_USER -d $POSTGRES_DB
+
+# Alterar a senha (substitua pela senha do .env.prod)
+ALTER ROLE aurora_user WITH PASSWORD 'SUA_SENHA_DO_ENV_PROD';
+
+# Sair
+\q
+exit
+
+# Reiniciar os serviços
+docker compose -f docker-compose.deploy.yml restart users-service auth-service events-service
+```
+
+**Solução B - Recriar o volume (APAGA todos os dados):**
+
+```bash
+docker compose -f docker-compose.deploy.yml down -v
+docker compose -f docker-compose.deploy.yml up -d
+```
+
+---
+
+### Problema 2: "role 'postgres' does not exist"
+
+**Sintoma:** O script de inicialização do banco falha com:
+```
+ERROR: role "postgres" does not exist
+```
+
+**Causa:** O `POSTGRES_USER` está configurado como `aurora_user`, mas o script SQL usa `AUTHORIZATION postgres`.
+
+**Solução:** Criar o role `postgres` manualmente:
+
+```bash
+docker exec -it aurora-db-deploy bash -c "
+  PGPASSWORD=\$POSTGRES_PASSWORD psql -U \$POSTGRES_USER -d \$POSTGRES_DB -c '
+    CREATE ROLE postgres WITH LOGIN;
+  '
+"
+
+# Re-executar o script de inicialização
+docker exec -it aurora-db-deploy bash -c "
+  PGPASSWORD=\$POSTGRES_PASSWORD psql -U \$POSTGRES_USER -d \$POSTGRES_DB \
+    -f /docker-entrypoint-initdb.d/01-create-db-and-schemas.sql
+"
+```
+
+---
+
+### Problema 3: Container reiniciando em loop (CrashLoopBackOff)
+
+**Sintoma:** `docker compose ps` mostra containers reiniciando constantemente.
+
+**Diagnóstico:**
+```bash
+# Ver logs do container problemático
+docker compose -f docker-compose.deploy.yml logs --tail 100 users-service
+
+# Ver status detalhado
+docker inspect aurora-users-deploy --format='{{.State.Status}} - {{.State.Error}}'
+```
+
+**Causas comuns:**
+1. Variáveis de ambiente faltando
+2. Banco de dados não está healthy
+3. Erro na aplicação
+
+**Solução - Verificar variáveis:**
+```bash
+# Comparar variáveis do container com o esperado
+docker exec aurora-users-deploy printenv | grep -E "^(DB_|POSTGRES_)" | sort
+```
+
+---
+
+### Problema 4: Serviços não conseguem se comunicar
+
+**Sintoma:** `auth-service` não consegue chamar `users-service`.
+
+**Diagnóstico:**
+```bash
+# Verificar se estão na mesma rede
+docker network inspect dsc-2025-2-aurora-platform_aurora_network
+
+# Testar DNS interno
+docker exec aurora-auth-deploy ping -c 2 users-service
+```
+
+**Solução:** Verificar se os serviços estão na mesma network no `docker-compose.deploy.yml`.
+
+---
+
+### Problema 5: "permission denied" ao executar docker
+
+**Sintoma:** Erro de permissão ao rodar comandos docker.
+
+**Solução:**
+```bash
+sudo usermod -aG docker $USER
+# IMPORTANTE: Desconectar e reconectar SSH
+exit
+ssh -i ~/.ssh/id_rsa ubuntu@<VPS_HOST>
+```
+
+---
+
+### Problema 6: Imagens não atualizam após deploy
+
+**Sintoma:** Mesmo após `docker compose pull`, a aplicação não reflete as mudanças.
+
+**Solução:** Forçar recriação dos containers:
+```bash
+docker compose -f docker-compose.deploy.yml up -d --force-recreate
+```
+
+---
+
+### Problema 7: Disco cheio
+
+**Sintoma:** Erros de "no space left on device".
+
+**Solução - Limpar recursos Docker não utilizados:**
+```bash
+# Ver uso de disco
+docker system df
+
+# Limpar imagens, containers e volumes não utilizados
+docker system prune -a --volumes
+```
+
+---
+
+### Comandos Úteis para Debug
+
+```bash
+# Ver todos os containers (incluindo parados)
+docker ps -a
+
+# Ver logs em tempo real
+docker compose -f docker-compose.deploy.yml logs -f
+
+# Entrar em um container
+docker exec -it aurora-users-deploy sh
+
+# Ver uso de recursos
+docker stats
+
+# Reiniciar um serviço específico
+docker compose -f docker-compose.deploy.yml restart users-service
+
+# Parar tudo
+docker compose -f docker-compose.deploy.yml down
+
+# Parar tudo E remover volumes (CUIDADO: apaga dados do banco)
+docker compose -f docker-compose.deploy.yml down -v
+
+# Ver variáveis de ambiente de um container
+docker exec aurora-users-deploy printenv | sort
+
+# Testar conexão com o banco de dentro de um serviço
+docker exec aurora-db-deploy bash -c "PGPASSWORD=\$POSTGRES_PASSWORD psql -U \$POSTGRES_USER -d \$POSTGRES_DB -c 'SELECT version();'"
+```
+
+---
+
+### Checklist de Verificação Pós-Deploy
+
+- [ ] Todos os containers estão rodando (`docker compose ps`)
+- [ ] O banco está healthy (status `healthy`)
+- [ ] `users-service` responde em `/users/health`
+- [ ] `events-service` responde em `/health`
+- [ ] `auth-service` está aceitando requisições na porta 3010
+- [ ] Logs não mostram erros de conexão com banco
+- [ ] Variáveis sensíveis não estão expostas nos logs

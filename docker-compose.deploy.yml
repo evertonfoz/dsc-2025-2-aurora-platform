@@ -34,7 +34,7 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_PASS: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
       SERVICE_TOKEN: ${SERVICE_TOKEN}
       HASH_PEPPER: ${HASH_PEPPER:-}
@@ -59,7 +59,7 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_PASS: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
       USERS_API_URL: "http://users-service:3011"
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
@@ -87,7 +87,7 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_PASS: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
     depends_on:
       db:
