@@ -2,10 +2,14 @@
 # Este workflow é responsável por fazer o deploy dos serviços em uma VPS.
 # Ele é acionado APÓS a conclusão bem-sucedida dos workflows de build,
 # garantindo que as imagens Docker já foram publicadas no GHCR.
+# Também pode ser disparado manualmente via workflow_dispatch.
 
 name: Deploy to VPS
 
 on:
+  # Permite disparo manual pelo GitHub UI ou CLI
+  workflow_dispatch:
+
   workflow_run:
     # Lista dos workflows que, ao terminarem, acionarão este deploy.
     workflows: ["build-auth-service", "build-users-service", "build-events-service"]
@@ -15,8 +19,8 @@ on:
 
 jobs:
   deploy:
-    # Executa o deploy apenas se o workflow que o acionou (o 'build') foi bem-sucedido.
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Executa o deploy apenas se foi disparado manualmente OU se o workflow de build foi bem-sucedido.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
