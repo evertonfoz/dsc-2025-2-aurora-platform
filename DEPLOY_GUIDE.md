@@ -1209,21 +1209,69 @@ curl http://$IP_VPS:3013/registrations/health
 
 ✅ **SUCESSO — Workflow de deploy funcionou perfeitamente**
 
+**Workflow CI/CD:**
 - ✅ Conexão SSH estabelecida com sucesso
 - ✅ `git pull origin main` executado
 - ✅ Login no GHCR bem-sucedido
 - ✅ Todas as 4 imagens baixadas (auth, users, events, registrations)
 - ✅ Containers reiniciados com sucesso
-- ✅ Todos os endpoints respondendo 200 OK
-
-**Tempo de execução:** ~45 segundos
+- ⏱️ **Tempo de execução:** ~45 segundos
 
 **Comando utilizado:**
 ```bash
 gh workflow run deploy-to-vps.yml -R evertonfoz/dsc-2025-2-aurora-platform
 ```
 
-**Próximos passos:** Deploy automático agora funciona! A cada push em `main` que modificar algum microsserviço, o build será feito e o deploy automático será acionado.
+**Testes de Validação Pós-Deploy:**
+
+Após o deploy automático bem-sucedido, foram realizados testes manuais via SSH:
+
+```bash
+# Health endpoint interno (via SSH na VPS)
+ssh ubuntu@64.181.173.121 "curl -s localhost:3013/registrations/health"
+# Resultado: {"status":"ok"} ✅
+```
+
+**Problemas Identificados e Corrigidos:**
+
+1. **Schema `registrations` não existia** ❌ → Criado manualmente ✅
+   ```bash
+   docker exec aurora-db-deploy psql -U aurora_user -d aurora_db \
+     -c 'CREATE SCHEMA IF NOT EXISTS registrations;'
+   ```
+
+2. **Container reiniciando em loop** ❌ → Após criar schema, reiniciou normalmente ✅
+   ```bash
+   docker compose --env-file .env.prod -f docker-compose.deploy.yml restart registrations-service
+   # Status: Up
+   ```
+
+3. **Porta 3013 bloqueada no iptables** ❌ → Regra adicionada ✅
+   ```bash
+   sudo iptables -I INPUT 5 -p tcp --dport 3013 -j ACCEPT
+   ```
+
+4. **Security List da Oracle Cloud** ❌ → Atualizada de `3010-3012` para `3010-3013` ✅
+
+5. **POST retornando erro 500** ⚠️ → Causado por falta de autenticação (`DEV_AUTO_AUTH=false`)
+   - Em produção real, usar JWT tokens via `auth-service`
+   - Para testes locais, pode adicionar `DEV_AUTO_AUTH=true` temporariamente
+
+**Status Final:**
+
+| Serviço | Status | Health Endpoint (interno) | Acesso Externo |
+|---------|--------|---------------------------|----------------|
+| auth-service | ✅ Up 2 days | ✅ OK | ✅ Porta 3010 OK |
+| users-service | ✅ Up 2 days | ✅ OK | ✅ Porta 3011 OK |
+| events-service | ✅ Up 2 days | ✅ OK | ✅ Porta 3012 OK |
+| registrations-service | ✅ Up | ✅ OK | ⏳ Aguardando propagação Security List |
+| db (PostgreSQL) | ✅ Up 2 hours (healthy) | ✅ OK | N/A (interno) |
+
+**Próximos passos:** 
+- Deploy automático funciona! A cada push em `main` que modificar algum microsserviço, o build será feito e o deploy automático será acionado.
+- Aguardar 2-5 minutos para regras de Security List propagarem
+- Testar acesso externo à porta 3013 novamente
+- Em produção real: implementar autenticação JWT completa (remover `DEV_AUTO_AUTH`)
 
 ---
 
@@ -1347,6 +1395,154 @@ sudo usermod -aG docker $USER
 # IMPORTANTE: Desconectar e reconectar SSH
 exit
 ssh -i ~/.ssh/id_rsa ubuntu@<VPS_HOST>
+```
+
+---
+
+### Problema 6: Schema "registrations" does not exist (registrations-service)
+
+**Sintoma:** O `registrations-service` fica reiniciando em loop com erro:
+
+```
+ERROR: schema "registrations" does not exist
+code: '3F000'
+```
+
+**Causa:** O schema `registrations` não foi criado no banco. Isso acontece quando:
+- O banco já existia antes do deploy do registrations-service
+- O arquivo `postgres-init/01-create-db-and-schemas.sql` não foi executado (só roda na primeira inicialização)
+
+**Diagnóstico:**
+
+```bash
+# Verificar se container está reiniciando
+docker ps | grep registrations
+
+# Ver logs
+docker logs aurora-registrations-deploy --tail 30
+
+# Verificar schemas existentes
+docker exec aurora-db-deploy psql -U postgres -d aurora_db -c '\dn'
+```
+
+**Solução — Criar schema manualmente:**
+
+```bash
+# Descobrir o owner do banco (geralmente aurora_user ou postgres)
+docker exec aurora-db-deploy psql -U postgres -c '\l aurora_db'
+
+# Criar schema com o usuário correto
+docker exec aurora-db-deploy psql -U aurora_user -d aurora_db -c 'CREATE SCHEMA IF NOT EXISTS registrations;'
+
+# Reiniciar o serviço
+cd ~/dsc-2025-2-aurora-platform
+docker compose --env-file .env.prod -f docker-compose.deploy.yml restart registrations-service
+
+# Verificar status (deve estar "Up")
+docker ps | grep registrations
+```
+
+**Prevenção futura:** Sempre que adicionar um novo microsserviço com schema próprio, lembre-se de:
+1. Adicionar o schema no `postgres-init/01-create-db-and-schemas.sql`
+2. Se o banco já existe, criar o schema manualmente antes do primeiro deploy
+
+---
+
+### Problema 7: Porta 3013 não acessível externamente
+
+**Sintoma:** Health endpoint funciona via SSH na VPS (`curl localhost:3013/registrations/health`) mas não funciona externamente.
+
+**Diagnóstico:**
+
+```bash
+# Testar localmente na VPS (deve funcionar)
+ssh ubuntu@<VPS_HOST> "curl -s localhost:3013/registrations/health"
+
+# Testar externamente (timeout)
+curl --connect-timeout 5 http://<VPS_HOST>:3013/registrations/health
+```
+
+**Causas:**
+
+1. **Iptables da VPS não tem regra para porta 3013**
+2. **Security List da Oracle Cloud não liberada**
+
+**Solução A — Adicionar regra no iptables (VPS):**
+
+```bash
+# Verificar regras atuais
+sudo iptables -L INPUT -n --line-numbers | grep 301
+
+# Adicionar regra para porta 3013
+sudo iptables -I INPUT 5 -p tcp --dport 3013 -j ACCEPT
+
+# Verificar se foi adicionada
+sudo iptables -L INPUT -n | grep 3013
+
+# Salvar permanentemente (Ubuntu/Debian)
+sudo netfilter-persistent save
+```
+
+**Solução B — Atualizar Security List (Oracle Cloud):**
+
+1. Acesse: Oracle Cloud Console → **Networking** → **Virtual Cloud Networks**
+2. Clique na sua VCN (ex: `vcn-aurora-project`)
+3. Clique em **Security Lists** → selecione a default
+4. Na aba **Ingress Rules**, edite a regra existente das portas 3010-3012
+5. Mude **Destination Port Range** de `3010-3012` para `3010-3013`
+6. Clique em **Save Changes**
+
+⏱️ **Aguarde 2-5 minutos** para a regra propagar antes de testar novamente.
+
+**Teste após correção:**
+
+```bash
+# Deve retornar: {"status":"ok"}
+curl http://<VPS_HOST>:3013/registrations/health
+```
+
+---
+
+### Problema 8: POST retorna erro 500 em produção (autenticação)
+
+**Sintoma:** Health endpoint funciona, mas POST `/registrations` retorna:
+
+```json
+{"statusCode":500,"message":"Internal server error","error":"Error"}
+```
+
+**Causa:** O decorator `@OwnerId()` retorna `undefined` porque não há autenticação configurada em produção (`DEV_AUTO_AUTH` não está habilitado).
+
+**Solução Temporária (apenas para testes):**
+
+Adicionar `DEV_AUTO_AUTH=true` no `.env.prod` da VPS:
+
+```bash
+# Na VPS
+echo "DEV_AUTO_AUTH=true" >> ~/dsc-2025-2-aurora-platform/.env.prod
+
+# Reiniciar o serviço
+cd ~/dsc-2025-2-aurora-platform
+docker compose --env-file .env.prod -f docker-compose.deploy.yml restart registrations-service
+```
+
+⚠️ **Importante:** `DEV_AUTO_AUTH=true` é **APENAS PARA TESTES**. Em produção real, você deve:
+
+1. Implementar autenticação JWT completa
+2. Usar tokens reais via `auth-service`
+3. Proteger endpoints com guards adequados
+4. Nunca usar `DEV_AUTO_AUTH=true` em ambientes públicos
+
+**Solução Permanente (produção real):**
+
+Implementar autenticação JWT no frontend/cliente e enviar token no header:
+
+```bash
+# Cliente envia token no header Authorization
+curl -X POST http://<VPS_HOST>:3013/registrations \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <JWT_TOKEN>" \
+  -d '{"eventId": 1, "origin": "mobile-app"}'
 ```
 
 ---
