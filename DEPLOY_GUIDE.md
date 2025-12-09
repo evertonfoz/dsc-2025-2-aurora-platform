@@ -10,7 +10,9 @@ Este documento descreve o processo de configuração de uma máquina virtual (VM
 - [Parte 3: Preparação Inicial da VPS](#parte-3-preparação-inicial-da-vps)
 - [Parte 4: Configuração do Arquivo `.env.prod`](#parte-4-configuração-do-arquivo-envprod)
 - [Parte 4.5: Teste Local (Máquina de Desenvolvimento)](#parte-45-teste-local-máquina-de-desenvolvimento)
+- [Parte 4.6: Teste de Release Bundle (Máquina de Desenvolvimento)](#parte-46-teste-de-release-bundle-máquina-de-desenvolvimento)
 - [Parte 5: Primeiro Deploy e Validação](#parte-5-primeiro-deploy-e-validação)
+- [Parte 5.5: Teste Manual do Workflow de Deploy](#parte-55-teste-manual-do-workflow-de-deploy)
 - [Parte 6: Troubleshooting - Problemas Comuns](#parte-6-troubleshooting---problemas-comuns)
 
 ---
@@ -788,7 +790,209 @@ Procure por erros de conexão com banco ou variáveis faltando.
 
 ---
 
-## Parte 5: Primeiro Deploy e Validação
+## Parte 4.6: Teste de Release Bundle (Máquina de Desenvolvimento)
+
+O **Release Bundle** é um pacote distribuível contendo o `docker-compose.deploy.yml` e arquivos SQL de inicialização do banco. É o que seria enviado para produção.
+
+### Objetivo
+
+Validar que o release bundle (gerado automaticamente pelo GitHub Actions) pode ser extraído e executado em um ambiente limpo com sucesso.
+
+### Pré-requisitos
+
+- Release bundle gerado (arquivo `.tar.gz` no GitHub Releases)
+- Docker e Docker Compose disponíveis
+- Diretório limpo para teste
+
+### Procedimento
+
+#### 1. Baixar o Release Bundle
+
+```bash
+# Crie um diretório de teste
+mkdir -p ~/Downloads/aurora-release-test
+cd ~/Downloads/aurora-release-test
+
+# Baixe a release mais recente
+gh release download latest \
+  --repo evertonfoz/dsc-2025-2-aurora-platform \
+  --pattern "deploy-bundle-*.tar.gz"
+
+# Ou manualmente via curl
+curl -L -o deploy-bundle.tar.gz \
+  "https://github.com/evertonfoz/dsc-2025-2-aurora-platform/releases/download/deploy-bundle-<SHORT_SHA>/deploy-bundle-<SHORT_SHA>.tar.gz"
+```
+
+#### 2. Extrair o Bundle
+
+```bash
+tar -xzf deploy-bundle-*.tar.gz
+ls -la
+# Esperado: docker-compose.deploy.yml, postgres-init/, https/, README-deploy.md
+```
+
+#### 3. Preparar o arquivo `.env.prod`
+
+O bundle **não inclui** `.env.prod` (por segurança). Você precisa criá-lo:
+
+```bash
+cat > .env.prod << 'EOF'
+NODE_ENV=production
+
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=AuroraSecure2025!
+POSTGRES_DB=aurora_db
+
+DB_HOST=db
+DB_PORT=5432
+DB_USER=postgres
+DB_PASS=AuroraSecure2025!
+DB_NAME=aurora_db
+DB_SSL=false
+DB_LOGGING=false
+
+REPO_OWNER=evertonfoz
+USERS_IMAGE_TAG=latest
+AUTH_IMAGE_TAG=latest
+EVENTS_IMAGE_TAG=latest
+REGISTRATIONS_IMAGE_TAG=latest
+
+JWT_ACCESS_SECRET=AuroraJwtAccessSecret2025!
+JWT_REFRESH_SECRET=AuroraJwtRefreshSecret2025!
+JWT_ACCESS_EXPIRES_IN=900
+
+SERVICE_TOKEN=AuroraServiceToken2025!
+HASH_PEPPER=
+
+USERS_API_URL=http://users-service:3011
+EVENTS_API_URL=http://events-service:3012
+AUTH_API_URL=http://auth-service:3010
+
+# Para teste local: habilite auto-auth
+DEV_AUTO_AUTH=true
+EOF
+```
+
+#### 4. (Opcional) Login no GHCR se as imagens forem privadas
+
+```bash
+# Se as imagens no GHCR forem privadas, faça login
+gh auth refresh -h ghcr.io --scopes read:packages
+# Ou use um PAT:
+echo "<PERSONAL_ACCESS_TOKEN>" | docker login ghcr.io -u <USER> --password-stdin
+```
+
+#### 5. Subir a Stack
+
+```bash
+# Validar syntax (dry-run)
+docker compose --env-file .env.prod -f docker-compose.deploy.yml config > /dev/null
+
+# Baixar imagens
+docker compose --env-file .env.prod -f docker-compose.deploy.yml pull
+
+# Subir containers
+docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d
+
+# Aguardar ~10s para inicialização
+sleep 10
+
+# Verificar status
+docker compose --env-file .env.prod -f docker-compose.deploy.yml ps
+```
+
+Saída esperada:
+```
+NAME                          STATUS                PORTS
+aurora-auth-deploy            Up 10 seconds         0.0.0.0:3010->3010/tcp
+aurora-db-deploy              Up 42 seconds (healthy) 5432/tcp
+aurora-events-deploy          Up 10 seconds         0.0.0.0:3012->3012/tcp
+aurora-registrations-deploy   Up 10 seconds         0.0.0.0:3013->3013/tcp
+aurora-users-deploy           Up 10 seconds         0.0.0.0:3011->3011/tcp
+```
+
+#### 6. Testar Endpoints
+
+```bash
+# Health endpoints
+curl -s http://localhost:3011/users/health | jq .
+# Esperado: {"status":"ok"}
+
+curl -s http://localhost:3012/health | jq .
+# Esperado: {"status":"ok"}
+
+curl -s http://localhost:3013/registrations/health | jq .
+# Esperado: {"status":"ok"}
+
+# CRUD: Criar uma registration
+curl -s -X POST http://localhost:3013/registrations \
+  -H "Content-Type: application/json" \
+  -d '{"eventId": 1, "origin": "test"}' | jq .
+# Esperado: 201 Created, JSON com registration
+
+# CRUD: Listar registrations do usuário
+curl -s http://localhost:3013/registrations/my | jq 'length'
+# Esperado: número > 0 (pelo menos 1 criado acima)
+```
+
+#### 7. Ver Logs
+
+```bash
+# Todos os serviços
+docker compose --env-file .env.prod -f docker-compose.deploy.yml logs --tail 50
+
+# Serviço específico
+docker compose --env-file .env.prod -f docker-compose.deploy.yml logs --tail 30 registrations-service
+```
+
+Procure por:
+- `Nest application successfully started` (confirmação de inicialização)
+- Sem `Error` ou `FATAL`
+
+#### 8. Cleanup
+
+```bash
+# Parar containers (preserva volumes/dados)
+docker compose --env-file .env.prod -f docker-compose.deploy.yml down
+
+# Ou parar E remover volumes (reseta banco)
+docker compose --env-file .env.prod -f docker-compose.deploy.yml down -v
+```
+
+### Resultado do Teste (09/12/2025)
+
+✅ **SUCESSO — Release Bundle funciona corretamente**
+
+- ✅ Download e extração do bundle
+- ✅ Todos 5 containers inicializados (auth, users, events, registrations, db)
+- ✅ Health endpoints respondendo 200 OK
+- ✅ CRUD operations funcionando (POST 201, GET 200)
+- ✅ Migrations executadas automaticamente
+- ✅ Database schema criado e dados persistindo
+
+**Comandos utilizados:**
+```bash
+mkdir -p ~/Downloads/aurora-release-test && cd ~/Downloads/aurora-release-test
+# ... download e extraction ...
+docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d
+# ... testing ...
+docker compose --env-file .env.prod -f docker-compose.deploy.yml ps
+```
+
+**Testes executados:**
+```bash
+curl -s http://localhost:3011/users/health | jq .        # ✅ {"status":"ok"}
+curl -s http://localhost:3012/health | jq .             # ✅ {"status":"ok"}
+curl -s http://localhost:3013/registrations/health | jq . # ✅ {"status":"ok"}
+
+curl -s -X POST http://localhost:3013/registrations \
+  -H "Content-Type: application/json" \
+  -d '{"eventId": 1, "origin": "test"}' | jq .           # ✅ 201 Created
+
+curl -s http://localhost:3013/registrations/my | jq 'length' # ✅ 1
+```
+
+---
 
 ### 1. Exportar variáveis de ambiente
 
@@ -896,6 +1100,178 @@ curl -X POST http://<IP_VPS>:3010/auth/login \
 >      sudo iptables -I INPUT 5 -p tcp --dport 3011 -j ACCEPT && \
 >      sudo iptables -I INPUT 5 -p tcp --dport 3012 -j ACCEPT"
 >    ```
+
+---
+
+## Parte 5.5: Teste Manual do Workflow de Deploy
+
+Antes de confiar no deploy automático (acionado por commits), é importante testar o workflow `deploy-to-vps.yml` manualmente.
+
+### Objetivo
+
+Validar que o workflow consegue:
+1. Conectar à VPS via SSH
+2. Atualizar o repositório (`git pull origin main`)
+3. Fazer login no GHCR
+4. Baixar as imagens mais recentes
+5. Reiniciar os containers
+
+### Pré-requisitos
+
+- VPS configurada e rodando (Parte 1, 2, 3 completas)
+- Todos os secrets configurados no GitHub (Parte 2)
+- `.env.prod` configurado na VPS (Parte 4)
+- GitHub CLI (`gh`) instalado localmente (opcional)
+
+### Disparar o Workflow Manualmente
+
+#### Opção A: Via GitHub CLI (recomendado)
+
+```bash
+# No diretório do repositório local
+gh workflow run deploy-to-vps.yml -R evertonfoz/dsc-2025-2-aurora-platform
+```
+
+Saída esperada:
+```
+✓ Created workflow_dispatch event for deploy-to-vps.yml at main
+```
+
+#### Opção B: Via GitHub UI
+
+1. Acesse: https://github.com/evertonfoz/dsc-2025-2-aurora-platform/actions/workflows/deploy-to-vps.yml
+2. Clique no botão **"Run workflow"** (azul, lado direito)
+3. Selecione a branch **main**
+4. Clique em **"Run workflow"** verde
+
+### Acompanhar a Execução
+
+**Via GitHub UI:**
+1. Acesse: https://github.com/evertonfoz/dsc-2025-2-aurora-platform/actions
+2. Veja a execução mais recente de "Deploy to VPS"
+3. Clique nela para ver os logs em tempo real
+
+**Duração esperada:** 20-60 segundos
+
+### Verificar o Resultado
+
+#### Sucesso ✅
+
+Você verá nos logs do workflow:
+
+```
+Deploy to VPS via SSH
+  Connecting to VPS...
+  Connected successfully
+  Pulling latest code...
+  Already up to date.
+  Logging into GHCR...
+  Login Succeeded
+  Pulling images...
+  ✔ auth-service Pulled
+  ✔ users-service Pulled
+  ✔ events-service Pulled
+  ✔ registrations-service Pulled
+  Starting services...
+  ✔ Container aurora-db-deploy       Healthy
+  ✔ Container aurora-auth-deploy     Started
+  ✔ Container aurora-users-deploy    Started
+  ✔ Container aurora-events-deploy   Started
+  ✔ Container aurora-registrations-deploy Started
+```
+
+**Status final:** ✅ Success (círculo verde)
+
+#### Falha ❌
+
+Se houver falha, os logs mostrarão o erro. Veja a Parte 6 (Troubleshooting) para soluções comuns.
+
+### Testar os Serviços na VPS
+
+Após o deploy bem-sucedido, teste os endpoints externamente:
+
+```bash
+# Substitua <IP_VPS> pelo IP público da sua instância
+IP_VPS="64.181.173.121"
+
+# Health endpoints
+curl http://$IP_VPS:3011/users/health
+# Esperado: {"status":"ok"}
+
+curl http://$IP_VPS:3012/health
+# Esperado: {"status":"ok"}
+
+curl http://$IP_VPS:3013/registrations/health
+# Esperado: {"status":"ok"}
+```
+
+### Resultado do Teste (09/12/2025)
+
+✅ **SUCESSO — Workflow de deploy funcionou perfeitamente**
+
+**Workflow CI/CD:**
+- ✅ Conexão SSH estabelecida com sucesso
+- ✅ `git pull origin main` executado
+- ✅ Login no GHCR bem-sucedido
+- ✅ Todas as 4 imagens baixadas (auth, users, events, registrations)
+- ✅ Containers reiniciados com sucesso
+- ⏱️ **Tempo de execução:** ~45 segundos
+
+**Comando utilizado:**
+```bash
+gh workflow run deploy-to-vps.yml -R evertonfoz/dsc-2025-2-aurora-platform
+```
+
+**Testes de Validação Pós-Deploy:**
+
+Após o deploy automático bem-sucedido, foram realizados testes manuais via SSH:
+
+```bash
+# Health endpoint interno (via SSH na VPS)
+ssh ubuntu@64.181.173.121 "curl -s localhost:3013/registrations/health"
+# Resultado: {"status":"ok"} ✅
+```
+
+**Problemas Identificados e Corrigidos:**
+
+1. **Schema `registrations` não existia** ❌ → Criado manualmente ✅
+   ```bash
+   docker exec aurora-db-deploy psql -U aurora_user -d aurora_db \
+     -c 'CREATE SCHEMA IF NOT EXISTS registrations;'
+   ```
+
+2. **Container reiniciando em loop** ❌ → Após criar schema, reiniciou normalmente ✅
+   ```bash
+   docker compose --env-file .env.prod -f docker-compose.deploy.yml restart registrations-service
+   # Status: Up
+   ```
+
+3. **Porta 3013 bloqueada no iptables** ❌ → Regra adicionada ✅
+   ```bash
+   sudo iptables -I INPUT 5 -p tcp --dport 3013 -j ACCEPT
+   ```
+
+4. **Security List da Oracle Cloud** ❌ → Atualizada de `3010-3012` para `3010-3013` ✅
+
+5. **POST retornando erro 500** ⚠️ → Causado por falta de autenticação (`DEV_AUTO_AUTH=false`)
+   - Em produção real, usar JWT tokens via `auth-service`
+   - Para testes locais, pode adicionar `DEV_AUTO_AUTH=true` temporariamente
+
+**Status Final:**
+
+| Serviço | Status | Health Endpoint (interno) | Acesso Externo |
+|---------|--------|---------------------------|----------------|
+| auth-service | ✅ Up 2 days | ✅ OK | ✅ Porta 3010 OK |
+| users-service | ✅ Up 2 days | ✅ OK | ✅ Porta 3011 OK |
+| events-service | ✅ Up 2 days | ✅ OK | ✅ Porta 3012 OK |
+| registrations-service | ✅ Up | ✅ OK | ⏳ Aguardando propagação Security List |
+| db (PostgreSQL) | ✅ Up 2 hours (healthy) | ✅ OK | N/A (interno) |
+
+**Próximos passos:** 
+- Deploy automático funciona! A cada push em `main` que modificar algum microsserviço, o build será feito e o deploy automático será acionado.
+- Aguardar 2-5 minutos para regras de Security List propagarem
+- Testar acesso externo à porta 3013 novamente
+- Em produção real: implementar autenticação JWT completa (remover `DEV_AUTO_AUTH`)
 
 ---
 
@@ -1019,6 +1395,154 @@ sudo usermod -aG docker $USER
 # IMPORTANTE: Desconectar e reconectar SSH
 exit
 ssh -i ~/.ssh/id_rsa ubuntu@<VPS_HOST>
+```
+
+---
+
+### Problema 6: Schema "registrations" does not exist (registrations-service)
+
+**Sintoma:** O `registrations-service` fica reiniciando em loop com erro:
+
+```
+ERROR: schema "registrations" does not exist
+code: '3F000'
+```
+
+**Causa:** O schema `registrations` não foi criado no banco. Isso acontece quando:
+- O banco já existia antes do deploy do registrations-service
+- O arquivo `postgres-init/01-create-db-and-schemas.sql` não foi executado (só roda na primeira inicialização)
+
+**Diagnóstico:**
+
+```bash
+# Verificar se container está reiniciando
+docker ps | grep registrations
+
+# Ver logs
+docker logs aurora-registrations-deploy --tail 30
+
+# Verificar schemas existentes
+docker exec aurora-db-deploy psql -U postgres -d aurora_db -c '\dn'
+```
+
+**Solução — Criar schema manualmente:**
+
+```bash
+# Descobrir o owner do banco (geralmente aurora_user ou postgres)
+docker exec aurora-db-deploy psql -U postgres -c '\l aurora_db'
+
+# Criar schema com o usuário correto
+docker exec aurora-db-deploy psql -U aurora_user -d aurora_db -c 'CREATE SCHEMA IF NOT EXISTS registrations;'
+
+# Reiniciar o serviço
+cd ~/dsc-2025-2-aurora-platform
+docker compose --env-file .env.prod -f docker-compose.deploy.yml restart registrations-service
+
+# Verificar status (deve estar "Up")
+docker ps | grep registrations
+```
+
+**Prevenção futura:** Sempre que adicionar um novo microsserviço com schema próprio, lembre-se de:
+1. Adicionar o schema no `postgres-init/01-create-db-and-schemas.sql`
+2. Se o banco já existe, criar o schema manualmente antes do primeiro deploy
+
+---
+
+### Problema 7: Porta 3013 não acessível externamente
+
+**Sintoma:** Health endpoint funciona via SSH na VPS (`curl localhost:3013/registrations/health`) mas não funciona externamente.
+
+**Diagnóstico:**
+
+```bash
+# Testar localmente na VPS (deve funcionar)
+ssh ubuntu@<VPS_HOST> "curl -s localhost:3013/registrations/health"
+
+# Testar externamente (timeout)
+curl --connect-timeout 5 http://<VPS_HOST>:3013/registrations/health
+```
+
+**Causas:**
+
+1. **Iptables da VPS não tem regra para porta 3013**
+2. **Security List da Oracle Cloud não liberada**
+
+**Solução A — Adicionar regra no iptables (VPS):**
+
+```bash
+# Verificar regras atuais
+sudo iptables -L INPUT -n --line-numbers | grep 301
+
+# Adicionar regra para porta 3013
+sudo iptables -I INPUT 5 -p tcp --dport 3013 -j ACCEPT
+
+# Verificar se foi adicionada
+sudo iptables -L INPUT -n | grep 3013
+
+# Salvar permanentemente (Ubuntu/Debian)
+sudo netfilter-persistent save
+```
+
+**Solução B — Atualizar Security List (Oracle Cloud):**
+
+1. Acesse: Oracle Cloud Console → **Networking** → **Virtual Cloud Networks**
+2. Clique na sua VCN (ex: `vcn-aurora-project`)
+3. Clique em **Security Lists** → selecione a default
+4. Na aba **Ingress Rules**, edite a regra existente das portas 3010-3012
+5. Mude **Destination Port Range** de `3010-3012` para `3010-3013`
+6. Clique em **Save Changes**
+
+⏱️ **Aguarde 2-5 minutos** para a regra propagar antes de testar novamente.
+
+**Teste após correção:**
+
+```bash
+# Deve retornar: {"status":"ok"}
+curl http://<VPS_HOST>:3013/registrations/health
+```
+
+---
+
+### Problema 8: POST retorna erro 500 em produção (autenticação)
+
+**Sintoma:** Health endpoint funciona, mas POST `/registrations` retorna:
+
+```json
+{"statusCode":500,"message":"Internal server error","error":"Error"}
+```
+
+**Causa:** O decorator `@OwnerId()` retorna `undefined` porque não há autenticação configurada em produção (`DEV_AUTO_AUTH` não está habilitado).
+
+**Solução Temporária (apenas para testes):**
+
+Adicionar `DEV_AUTO_AUTH=true` no `.env.prod` da VPS:
+
+```bash
+# Na VPS
+echo "DEV_AUTO_AUTH=true" >> ~/dsc-2025-2-aurora-platform/.env.prod
+
+# Reiniciar o serviço
+cd ~/dsc-2025-2-aurora-platform
+docker compose --env-file .env.prod -f docker-compose.deploy.yml restart registrations-service
+```
+
+⚠️ **Importante:** `DEV_AUTO_AUTH=true` é **APENAS PARA TESTES**. Em produção real, você deve:
+
+1. Implementar autenticação JWT completa
+2. Usar tokens reais via `auth-service`
+3. Proteger endpoints com guards adequados
+4. Nunca usar `DEV_AUTO_AUTH=true` em ambientes públicos
+
+**Solução Permanente (produção real):**
+
+Implementar autenticação JWT no frontend/cliente e enviar token no header:
+
+```bash
+# Cliente envia token no header Authorization
+curl -X POST http://<VPS_HOST>:3013/registrations \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <JWT_TOKEN>" \
+  -d '{"eventId": 1, "origin": "mobile-app"}'
 ```
 
 ---
