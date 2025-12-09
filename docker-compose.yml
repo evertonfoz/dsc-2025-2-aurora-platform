@@ -118,27 +118,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: "node dist/main.js"
-    networks:
-      - aurora_network
-
-  registrations-migrations:
-    build:
-      context: .
-      dockerfile: ./packages/registrations-service/Dockerfile
-    container_name: aurora-registrations-migrations
-    # do not restart; this should be a one-shot migration runner
-    restart: 'no'
-    env_file:
-      - .env
-    environment:
-      NODE_ENV: development
-      DB_SCHEMA: registrations
-    depends_on:
-      db:
-        condition: service_healthy
-    # run compiled JS migration runner from the image
-    command: "node dist/run-migrations.js"
+    # run migrations on startup, then start the service
+    command: "sh -c 'node dist/run-migrations.js && node dist/main.js'"
     networks:
       - aurora_network
 
