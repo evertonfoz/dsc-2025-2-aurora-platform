@@ -788,7 +788,209 @@ Procure por erros de conexão com banco ou variáveis faltando.
 
 ---
 
-## Parte 5: Primeiro Deploy e Validação
+## Parte 4.6: Teste de Release Bundle (Máquina de Desenvolvimento)
+
+O **Release Bundle** é um pacote distribuível contendo o `docker-compose.deploy.yml` e arquivos SQL de inicialização do banco. É o que seria enviado para produção.
+
+### Objetivo
+
+Validar que o release bundle (gerado automaticamente pelo GitHub Actions) pode ser extraído e executado em um ambiente limpo com sucesso.
+
+### Pré-requisitos
+
+- Release bundle gerado (arquivo `.tar.gz` no GitHub Releases)
+- Docker e Docker Compose disponíveis
+- Diretório limpo para teste
+
+### Procedimento
+
+#### 1. Baixar o Release Bundle
+
+```bash
+# Crie um diretório de teste
+mkdir -p ~/Downloads/aurora-release-test
+cd ~/Downloads/aurora-release-test
+
+# Baixe a release mais recente
+gh release download latest \
+  --repo evertonfoz/dsc-2025-2-aurora-platform \
+  --pattern "deploy-bundle-*.tar.gz"
+
+# Ou manualmente via curl
+curl -L -o deploy-bundle.tar.gz \
+  "https://github.com/evertonfoz/dsc-2025-2-aurora-platform/releases/download/deploy-bundle-<SHORT_SHA>/deploy-bundle-<SHORT_SHA>.tar.gz"
+```
+
+#### 2. Extrair o Bundle
+
+```bash
+tar -xzf deploy-bundle-*.tar.gz
+ls -la
+# Esperado: docker-compose.deploy.yml, postgres-init/, https/, README-deploy.md
+```
+
+#### 3. Preparar o arquivo `.env.prod`
+
+O bundle **não inclui** `.env.prod` (por segurança). Você precisa criá-lo:
+
+```bash
+cat > .env.prod << 'EOF'
+NODE_ENV=production
+
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=AuroraSecure2025!
+POSTGRES_DB=aurora_db
+
+DB_HOST=db
+DB_PORT=5432
+DB_USER=postgres
+DB_PASS=AuroraSecure2025!
+DB_NAME=aurora_db
+DB_SSL=false
+DB_LOGGING=false
+
+REPO_OWNER=evertonfoz
+USERS_IMAGE_TAG=latest
+AUTH_IMAGE_TAG=latest
+EVENTS_IMAGE_TAG=latest
+REGISTRATIONS_IMAGE_TAG=latest
+
+JWT_ACCESS_SECRET=AuroraJwtAccessSecret2025!
+JWT_REFRESH_SECRET=AuroraJwtRefreshSecret2025!
+JWT_ACCESS_EXPIRES_IN=900
+
+SERVICE_TOKEN=AuroraServiceToken2025!
+HASH_PEPPER=
+
+USERS_API_URL=http://users-service:3011
+EVENTS_API_URL=http://events-service:3012
+AUTH_API_URL=http://auth-service:3010
+
+# Para teste local: habilite auto-auth
+DEV_AUTO_AUTH=true
+EOF
+```
+
+#### 4. (Opcional) Login no GHCR se as imagens forem privadas
+
+```bash
+# Se as imagens no GHCR forem privadas, faça login
+gh auth refresh -h ghcr.io --scopes read:packages
+# Ou use um PAT:
+echo "<PERSONAL_ACCESS_TOKEN>" | docker login ghcr.io -u <USER> --password-stdin
+```
+
+#### 5. Subir a Stack
+
+```bash
+# Validar syntax (dry-run)
+docker compose --env-file .env.prod -f docker-compose.deploy.yml config > /dev/null
+
+# Baixar imagens
+docker compose --env-file .env.prod -f docker-compose.deploy.yml pull
+
+# Subir containers
+docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d
+
+# Aguardar ~10s para inicialização
+sleep 10
+
+# Verificar status
+docker compose --env-file .env.prod -f docker-compose.deploy.yml ps
+```
+
+Saída esperada:
+```
+NAME                          STATUS                PORTS
+aurora-auth-deploy            Up 10 seconds         0.0.0.0:3010->3010/tcp
+aurora-db-deploy              Up 42 seconds (healthy) 5432/tcp
+aurora-events-deploy          Up 10 seconds         0.0.0.0:3012->3012/tcp
+aurora-registrations-deploy   Up 10 seconds         0.0.0.0:3013->3013/tcp
+aurora-users-deploy           Up 10 seconds         0.0.0.0:3011->3011/tcp
+```
+
+#### 6. Testar Endpoints
+
+```bash
+# Health endpoints
+curl -s http://localhost:3011/users/health | jq .
+# Esperado: {"status":"ok"}
+
+curl -s http://localhost:3012/health | jq .
+# Esperado: {"status":"ok"}
+
+curl -s http://localhost:3013/registrations/health | jq .
+# Esperado: {"status":"ok"}
+
+# CRUD: Criar uma registration
+curl -s -X POST http://localhost:3013/registrations \
+  -H "Content-Type: application/json" \
+  -d '{"eventId": 1, "origin": "test"}' | jq .
+# Esperado: 201 Created, JSON com registration
+
+# CRUD: Listar registrations do usuário
+curl -s http://localhost:3013/registrations/my | jq 'length'
+# Esperado: número > 0 (pelo menos 1 criado acima)
+```
+
+#### 7. Ver Logs
+
+```bash
+# Todos os serviços
+docker compose --env-file .env.prod -f docker-compose.deploy.yml logs --tail 50
+
+# Serviço específico
+docker compose --env-file .env.prod -f docker-compose.deploy.yml logs --tail 30 registrations-service
+```
+
+Procure por:
+- `Nest application successfully started` (confirmação de inicialização)
+- Sem `Error` ou `FATAL`
+
+#### 8. Cleanup
+
+```bash
+# Parar containers (preserva volumes/dados)
+docker compose --env-file .env.prod -f docker-compose.deploy.yml down
+
+# Ou parar E remover volumes (reseta banco)
+docker compose --env-file .env.prod -f docker-compose.deploy.yml down -v
+```
+
+### Resultado do Teste (09/12/2025)
+
+✅ **SUCESSO — Release Bundle funciona corretamente**
+
+- ✅ Download e extração do bundle
+- ✅ Todos 5 containers inicializados (auth, users, events, registrations, db)
+- ✅ Health endpoints respondendo 200 OK
+- ✅ CRUD operations funcionando (POST 201, GET 200)
+- ✅ Migrations executadas automaticamente
+- ✅ Database schema criado e dados persistindo
+
+**Comandos utilizados:**
+```bash
+mkdir -p ~/Downloads/aurora-release-test && cd ~/Downloads/aurora-release-test
+# ... download e extraction ...
+docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d
+# ... testing ...
+docker compose --env-file .env.prod -f docker-compose.deploy.yml ps
+```
+
+**Testes executados:**
+```bash
+curl -s http://localhost:3011/users/health | jq .        # ✅ {"status":"ok"}
+curl -s http://localhost:3012/health | jq .             # ✅ {"status":"ok"}
+curl -s http://localhost:3013/registrations/health | jq . # ✅ {"status":"ok"}
+
+curl -s -X POST http://localhost:3013/registrations \
+  -H "Content-Type: application/json" \
+  -d '{"eventId": 1, "origin": "test"}' | jq .           # ✅ 201 Created
+
+curl -s http://localhost:3013/registrations/my | jq 'length' # ✅ 1
+```
+
+---
 
 ### 1. Exportar variáveis de ambiente
 
