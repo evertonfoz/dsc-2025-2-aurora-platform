@@ -1,1617 +1,973 @@
-# Guia de Deploy Automatizado na VPS (Oracle Cloud)
+# Guia Completo de Deploy — Aurora Platform
 
-Este documento descreve o processo de configuração de uma máquina virtual (VM) na Oracle Cloud Infrastructure (OCI) e a configuração dos segredos necessários no GitHub para habilitar o deploy contínuo (CD) da aplicação Aurora Platform.
+> **Tutorial Passo a Passo para Alunos**  
+> Este guia foi elaborado com base em problemas reais encontrados durante o deploy do projeto Aurora Platform. Siga cada passo com atenção.
 
 ## Índice
 
-- [Visão Geral do Processo](#visão-geral-do-processo)
-- [Parte 1: Configuração da Instância na Oracle Cloud (VPS)](#parte-1-configuração-da-instância-na-oracle-cloud-vps)
-- [Parte 2: Configuração dos Segredos no GitHub](#parte-2-configuração-dos-segredos-no-github)
-- [Parte 3: Preparação Inicial da VPS](#parte-3-preparação-inicial-da-vps)
-- [Parte 4: Configuração do Arquivo `.env.prod`](#parte-4-configuração-do-arquivo-envprod)
-- [Parte 4.5: Teste Local (Máquina de Desenvolvimento)](#parte-45-teste-local-máquina-de-desenvolvimento)
-- [Parte 4.6: Teste de Release Bundle (Máquina de Desenvolvimento)](#parte-46-teste-de-release-bundle-máquina-de-desenvolvimento)
-- [Parte 5: Primeiro Deploy e Validação](#parte-5-primeiro-deploy-e-validação)
-- [Parte 5.5: Teste Manual do Workflow de Deploy](#parte-55-teste-manual-do-workflow-de-deploy)
-- [Parte 6: Troubleshooting - Problemas Comuns](#parte-6-troubleshooting---problemas-comuns)
+1. [Visão Geral do Sistema](#1-visão-geral-do-sistema)
+2. [Parte 1: Criar a VPS na Oracle Cloud](#parte-1-criar-a-vps-na-oracle-cloud)
+3. [Parte 2: Configurar Secrets no GitHub](#parte-2-configurar-secrets-no-github)
+4. [Parte 3: Preparar a VPS (SSH, Docker, Git)](#parte-3-preparar-a-vps-ssh-docker-git)
+5. [Parte 4: Configurar o `.env.prod`](#parte-4-configurar-o-envprod)
+6. [Parte 5: Primeiro Deploy (Manual)](#parte-5-primeiro-deploy-manual)
+7. [Parte 6: Testar Localmente (Máquina de Desenvolvimento)](#parte-6-testar-localmente-máquina-de-desenvolvimento)
+8. [Parte 7: Deploy Automático (CI/CD)](#parte-7-deploy-automático-cicd)
+9. [Parte 8: Solução de Problemas (Troubleshooting)](#parte-8-solução-de-problemas-troubleshooting)
+10. [Parte 9: SSH Tunnel — Acessar VPS de Redes Bloqueadas](#parte-9-ssh-tunnel--acessar-vps-de-redes-bloqueadas)
+11. [Apêndice: Comandos Úteis](#apêndice-comandos-úteis)
 
 ---
 
-## Visão Geral do Processo
+## 1. Visão Geral do Sistema
 
-O pipeline de CI/CD funciona em duas etapas principais:
-1.  **CI (Integração Contínua):** Workflows (`build-*.yml`) constroem as imagens Docker de cada microsserviço e as publicam no GitHub Container Registry (GHCR) a cada push na branch `main`.
-2.  **CD (Deploy Contínuo):** Um workflow (`deploy-to-vps.yml`) é acionado após a conclusão bem-sucedida dos workflows de build. Ele se conecta à VPS via SSH, atualiza o repositório, baixa as novas imagens do GHCR e reinicia os serviços usando `docker-compose`.
+### Arquitetura de Microsserviços
 
-### Arquitetura dos Serviços
+A Aurora Platform é composta por 4 microsserviços + 1 banco de dados:
 
 | Serviço | Porta | Descrição |
 |---------|-------|-----------|
-| `auth-service` | 3010 | Autenticação (login, logout, refresh token) |
+| `auth-service` | 3010 | Autenticação (login, logout, JWT tokens) |
 | `users-service` | 3011 | Gerenciamento de usuários |
 | `events-service` | 3012 | Gerenciamento de eventos |
-| `registrations-service` | 3013 | Gerenciamento de registros/inscrições em eventos |
-| `db` (PostgreSQL) | 5432 | Banco de dados compartilhado com schemas separados |
+| `registrations-service` | 3013 | Inscrições em eventos |
+| `db` (PostgreSQL) | 5432 | Banco de dados (schemas separados por serviço) |
 
-### Workflows de CI/CD
+### Schemas do Banco de Dados
 
-Os workflows do GitHub Actions estão localizados em `.github/workflows/`:
+Cada microsserviço tem seu próprio schema no PostgreSQL:
 
-#### Build Workflows (CI)
+```
+aurora_db/
+├── auth          # Tabelas do auth-service
+├── users         # Tabelas do users-service
+├── events        # Tabelas do events-service
+└── registrations # Tabelas do registrations-service
+```
 
-Cada microsserviço tem seu próprio workflow de build que:
-1. É disparado quando há mudanças no código do serviço ou no próprio workflow (via `paths` trigger)
-2. Compila a imagem Docker usando Docker Buildx (suporta multi-plataforma: `linux/amd64` e `linux/arm64`)
-3. Faz login no GitHub Container Registry (GHCR) usando `GITHUB_TOKEN`
-4. Publica a imagem com tags `latest`, `short-sha`, e `branch-name`
+### Pipeline CI/CD
 
-**Workflows de build disponíveis:**
-- `build-auth-service.yml` — Disparado por mudanças em `packages/auth-service/**`
-- `build-users-service.yml` — Disparado por mudanças em `packages/users-service/**`
-- `build-events-service.yml` — Disparado por mudanças em `packages/events-service/**`
-- `build-registrations-service.yml` — Disparado por mudanças em `packages/registrations-service/**`
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         GitHub Actions                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  Push em main → Build Workflow → Publica imagem no GHCR            │
+│                        ↓                                            │
+│              Deploy Workflow → SSH na VPS → Atualiza containers    │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
-#### Deploy Workflow (CD)
+**Workflows disponíveis** (`.github/workflows/`):
 
-O workflow `deploy-to-vps.yml`:
-1. É acionado **automaticamente** após a conclusão bem-sucedida de **qualquer** um dos workflows de build (via `workflow_run` trigger)
-2. Pode também ser disparado **manualmente** via `workflow_dispatch` (útil para redeployment de emergência)
-3. Conecta à VPS via SSH (usando secrets: `VPS_HOST`, `VPS_USERNAME`, `VPS_PRIVATE_KEY`, `VPS_PORT`)
-4. Executa os seguintes passos na VPS:
-   - Atualiza o repositório local com `git pull origin main`
-   - Carrega variáveis de `.env.prod`
-   - Faz login no GHCR com `GH_PAT`
-   - Baixa as imagens mais recentes
-   - Reinicia os containers com `docker compose up -d`
+| Workflow | Trigger | Descrição |
+|----------|---------|-----------|
+| `build-auth-service.yml` | Push em `packages/auth-service/**` | Build e push da imagem |
+| `build-users-service.yml` | Push em `packages/users-service/**` | Build e push da imagem |
+| `build-events-service.yml` | Push em `packages/events-service/**` | Build e push da imagem |
+| `build-registrations-service.yml` | Push em `packages/registrations-service/**` | Build e push da imagem |
+| `deploy-to-vps.yml` | Após qualquer build ou manual | Deploy na VPS via SSH |
 
 ---
 
-## Parte 1: Configuração da Instância na Oracle Cloud (VPS)
+## Parte 1: Criar a VPS na Oracle Cloud
 
-Siga estes passos para criar a VM que servirá como nosso ambiente de produção.
+### 1.1 Criar Conta na Oracle Cloud
 
-### 1. Criação da Instância (VM)
+1. Acesse: https://cloud.oracle.com
+2. Clique em **"Start for free"**
+3. Complete o cadastro (requer cartão de crédito, mas não será cobrado no Free Tier)
+4. Aguarde a ativação da conta (pode levar alguns minutos)
 
-1.  Acesse o painel da **Oracle Cloud**.
-2.  Navegue até **Compute** > **Instances**.
-3.  Clique em **Create instance**.
+### 1.2 Criar a Instância (VM)
 
-### 2. Configurações Principais
-
-Preencha os campos da seguinte forma:
-
-*   **Name:** Dê um nome descritivo, como `aurora-platform-vm`.
-*   **Image and shape:**
-    *   **Image:** Clique em "Change image" e selecione **Canonical Ubuntu 22.04** (ou a versão LTS mais recente). Evite as versões "Minimal" ou "aarch64".
-    *   **Shape:** Escolha uma "Always Free-eligible", como a **VM.Standard.E2.1.Micro**.
-*   **Networking:**
-    *   **Virtual cloud network:** Selecione `Create new virtual cloud network`. Dê um nome como `vcn-aurora-project`.
-    *   **Subnet:** Selecione `Create new public subnet`. Dê um nome como `subnet-public-aurora`.
-    *   **Public IP address:** Marque a opção **`Assign a public IPv4 address`**.
-*   **Add SSH keys:**
-    *   Selecione a opção **`Paste public key`**.
-    *   No seu computador local, execute `cat ~/.ssh/id_rsa.pub` para obter sua chave pública.
-    *   Cole o conteúdo completo da chave na caixa de texto.
-*   **Boot volume:**
-    *   Marque a opção **`Use in-transit encryption`**.
-    *   Mantenha as outras configurações padrão.
-
-4.  Clique em **Create**.
-
-### 3. (Opcional) Corrigindo a Falta de IP Público
-
-Se, após a criação, a instância aparecer com "Public IP address: -", siga estes passos:
-1.  Na página de detalhes da instância, vá para a aba **Networking**.
-2.  Role para baixo até a seção **"Attached VNICs"** e clique no nome da sua VNIC (ex: `vnic-aurora-vm-01`).
-3.  Na página de detalhes da VNIC, vá para a seção **"IPv4 Addresses"** (ou "IP Administration").
-4.  Na linha do seu IP privado, clique no menu de três pontos (⋮) e selecione **Edit**.
-5.  Na janela que abrir, em "Public IP Type", selecione **"Ephemeral public IP"**.
-6.  Clique em **Update**.
-
-### 4. Configurar Security List (Liberar Portas dos Serviços)
-
-Por padrão, a Oracle Cloud bloqueia todo o tráfego de entrada, exceto SSH (porta 22). Para acessar os serviços da Aurora Platform externamente, você precisa liberar as portas 3010-3013 na Security List da VCN.
-
-#### Passo a passo:
-
-1.  No painel da Oracle Cloud, vá em **Networking** → **Virtual cloud networks**.
-2.  Clique na VCN da sua instância (ex: `vcn-aurora-project`).
-3.  No menu lateral ou na lista de recursos, clique em **Security Lists**.
-4.  Clique na security list padrão (ex: `Default Security List for vcn-aurora-project`).
-5.  Na aba **Ingress Rules**, clique em **Add Ingress Rules**.
-6.  Preencha os campos:
+1. No painel Oracle Cloud, vá para **Compute** → **Instances**
+2. Clique em **Create instance**
+3. Configure:
 
 | Campo | Valor |
 |-------|-------|
-| **Stateless** | Não (deixe desmarcado) |
+| **Name** | `aurora-platform-vm` |
+| **Compartment** | Seu compartment (geralmente root) |
+| **Image** | **Canonical Ubuntu 22.04** (clique em "Change image") |
+| **Shape** | **VM.Standard.E2.1.Micro** (Always Free) |
+
+4. Em **Networking**:
+   - **Virtual cloud network**: Create new → nome: `vcn-aurora`
+   - **Subnet**: Create new public subnet → nome: `subnet-aurora`
+   - **Public IP**: ✅ **Assign a public IPv4 address**
+
+5. Em **Add SSH keys**:
+   - Selecione **Paste public key**
+   - No seu terminal local, execute:
+     ```bash
+     cat ~/.ssh/id_rsa.pub
+     ```
+   - Cole a chave pública completa
+
+6. Clique em **Create**
+
+7. **Anote o IP público** (ex: `64.181.173.121`) — você vai precisar dele
+
+### 1.3 Liberar Portas no Security List
+
+Por padrão, apenas a porta 22 (SSH) está aberta. Você precisa liberar as portas dos serviços:
+
+1. No Oracle Cloud, vá para **Networking** → **Virtual Cloud Networks**
+2. Clique na sua VCN (`vcn-aurora`)
+3. Clique em **Security Lists** → **Default Security List for vcn-aurora**
+4. Na aba **Ingress Rules**, clique em **Add Ingress Rules**
+5. Preencha:
+
+| Campo | Valor |
+|-------|-------|
+| **Stateless** | ❌ (desmarcado) |
 | **Source Type** | CIDR |
 | **Source CIDR** | `0.0.0.0/0` |
 | **IP Protocol** | TCP |
-| **Source Port Range** | (deixe vazio - All) |
+| **Source Port Range** | (deixe vazio) |
 | **Destination Port Range** | `3010-3013` |
-| **Description** | `Aurora Platform Services (auth, users, events, registrations)` |
+| **Description** | Aurora Platform Services |
 
-7.  Clique em **Add Ingress Rules**.
+6. Clique em **Add Ingress Rules**
 
-> **Nota de Segurança:** Em produção real, considere restringir o `Source CIDR` para IPs específicos ou usar um Load Balancer/API Gateway.
-
-#### Verificação
-
-Após adicionar a regra, você deve ter 4 regras de Ingress:
-- TCP porta 22 (SSH)
-- TCP portas 3010-3012 (Aurora Platform)
-- ICMP (diagnósticos de rede)
+> ⚠️ **Importante**: As regras podem levar **2-5 minutos** para propagar. Seja paciente!
 
 ---
 
-## Parte 2: Configuração dos Segredos no GitHub
+## Parte 2: Configurar Secrets no GitHub
 
-Para que o workflow de deploy (`deploy-to-vps.yml`) funcione, ele precisa de credenciais para acessar a VPS e o registro de pacotes do GitHub.
+O workflow de deploy precisa de credenciais para acessar a VPS. Configure os seguintes secrets:
 
-Navegue até o seu repositório no GitHub e vá para **Settings** > **Secrets and variables** > **Actions**. Crie os 5 segredos a seguir:
+1. No GitHub, vá para **Settings** → **Secrets and variables** → **Actions**
+2. Clique em **New repository secret** para cada um:
 
-#### 1. `VPS_HOST`
-*   **Descrição:** O endereço IP público da sua instância na Oracle Cloud.
-*   **Como obter:** Na página de detalhes da sua instância na OCI, copie o valor do campo **Public IP address**.
+| Secret | Valor | Como obter |
+|--------|-------|------------|
+| `VPS_HOST` | IP público da VPS | Ex: `64.181.173.121` |
+| `VPS_USERNAME` | `ubuntu` | Usuário padrão do Ubuntu |
+| `VPS_PORT` | `22` | Porta SSH padrão |
+| `VPS_PRIVATE_KEY` | Conteúdo de `~/.ssh/id_rsa` | `cat ~/.ssh/id_rsa` (copie TUDO) |
+| `VPS_PROJECT_DIR` | `dsc-2025-2-aurora-platform` | Nome do diretório na VPS |
+| `GH_PAT` | Personal Access Token | Ver instruções abaixo |
 
-#### 2. `VPS_USERNAME`
-*   **Descrição:** O nome de usuário para a conexão SSH.
-*   **Como obter:** Como usamos uma imagem Ubuntu, o valor é sempre `ubuntu`.
+### Criar o GH_PAT (Personal Access Token)
 
-#### 3. `VPS_PORT`
-*   **Descrição:** A porta para a conexão SSH.
-*   **Como obter:** O valor padrão é `22`.
-
-#### 4. `VPS_PRIVATE_KEY`
-*   **Descrição:** A chave SSH privada do seu computador, que corresponde à chave pública que você inseriu na Oracle.
-*   **Como obter:**
-    1.  No seu terminal local, execute o comando: `cat ~/.ssh/id_rsa`
-    2.  Copie **todo o conteúdo exibido**, incluindo as linhas `-----BEGIN ... KEY-----` e `-----END ... KEY-----`.
-    3.  Cole este conteúdo no valor do segredo.
-
-#### 5. `GH_PAT`
-*   **Descrição:** Um Personal Access Token (PAT) do GitHub para permitir que a VPS baixe as imagens Docker privadas.
-*   **Como obter:**
-    1.  No GitHub, vá para **Settings** > **Developer settings** > **Personal access tokens** > **Tokens (classic)**.
-    2.  Clique em **Generate new token**.
-    3.  Dê um nome (ex: `AURORA_DEPLOY_VPS`) e marque o escopo (permissão) **`read:packages`**.
-    4.  Gere o token e copie o valor para este segredo.
-
-#### Segurança — token exposto e rotação
-
-Se um PAT for acidentalmente exposto (por exemplo, colado em um chat ou log), revogue-o imediatamente e gere um novo. Abaixo estão passos rápidos e comandos úteis:
-
-- Revogar o token (UI): GitHub → sua foto → Settings → Developer settings → Personal access tokens → Tokens (classic) → Revoke/Delete o token comprometido.
-- Gerar novo token: crie com o nome `AURORA_DEPLOY_VPS` e scopes mínimos (`read:packages`; adicione `repo` só se necessário). Copie o valor IMEDIATAMENTE — não será possível visualizá-lo depois.
-- Atualizar secret `GH_PAT` no repositório (recomendado a partir do seu computador local):
-
-```bash
-# substituir <SEU_NOVO_TOKEN_AQUI> pelo token copiado
-echo -n "<SEU_NOVO_TOKEN_AQUI>" | gh secret set GH_PAT -R evertonfoz/dsc-2025-2-aurora-platform
-```
-
-- Alternativa pela UI: Repositório → Settings → Secrets and variables → Actions → New repository secret / Update existing → Name `GH_PAT` → Value = token.
-- Testar login no GitHub Container Registry (GHCR) na VPS:
-
-```bash
-# no servidor (substitua <OWNER> pelo seu usuário/org)
-echo -n "<SEU_NOVO_TOKEN_AQUI>" | docker login ghcr.io -u <OWNER> --password-stdin
-```
-
-- Se você estiver autenticando a CLI `gh` na VPS, use (cole o token no terminal do VPS):
-
-```bash
-echo -n "<SEU_NOVO_TOKEN_AQUI>" | gh auth login --with-token
-```
-
-Observações importantes:
-- Nunca cole tokens em chats ou repositórios públicos.
-- Se não tiver certeza se um token foi exposto, revogue-o e gere outro — é a maneira mais segura.
-
-
-#### 6. `VPS_PROJECT_DIR`
-*   **Descrição:** Nome do diretório no servidor onde o projeto será clonado/executado (ex: `dsc-2025-2-aurora-platform` ou `aurora-platform`).
-*   **Como obter/configurar:** Defina um valor consistente com o diretório que você usará na VPS. Este valor é usado pelo workflow `deploy-to-vps.yml` para navegar até o projeto antes de atualizar imagens e reiniciar os serviços.
-*   **Como adicionar:** Vá em **Settings** > **Secrets and variables** > **Actions** e crie `VPS_PROJECT_DIR` com o nome do diretório desejado.
-
-**Como confirmar o valor de `VPS_PROJECT_DIR` na VPS**
-
-Se você não tem certeza qual é o nome do diretório que contém o projeto na VPS, conecte-se à máquina e execute estas verificações (substitua `<POSSIVEL_DIR>` conforme necessário):
-
-```bash
-# listar diretórios em /home/ubuntu
-ls -la /home/ubuntu
-
-# procurar pastas com nome parecido
-find /home/ubuntu -maxdepth 2 -type d -name '*aurora*' -print
-
-# confirmar que é um repositório Git e checar o remote
-git -C /home/ubuntu/<POSSIVEL_DIR> remote get-url origin
-```
-
-O valor do secret `VPS_PROJECT_DIR` deve ser apenas o nome do diretório (por exemplo `dsc-2025-2-aurora-platform`), sem `/home/ubuntu/`.
-
-**Criando os secrets via GitHub CLI (`gh`)**
-
-Se preferir criar os secrets pela linha de comando com a GitHub CLI, autentique o `gh` com uma conta que tenha permissão no repositório e execute os comandos abaixo substituindo `OWNER/REPO` pelo seu repositório (ex: `evertonfoz/dsc-2025-2-aurora-platform`) e os valores correspondentes:
-
-```bash
-# substitua OWNER/REPO pelo seu repositório
-REPO=OWNER/REPO
-
-# VPS host (IP)
-echo -n "<VPS_HOST_IP>" | gh secret set VPS_HOST -R "$REPO"
-
-# VPS username (ex: ubuntu)
-echo -n "ubuntu" | gh secret set VPS_USERNAME -R "$REPO"
-
-# VPS SSH port (ex: 22)
-echo -n "22" | gh secret set VPS_PORT -R "$REPO"
-
-# VPS private key (conteúdo do arquivo ~/.ssh/id_rsa)
-gh secret set VPS_PRIVATE_KEY -R "$REPO" --body "$(cat ~/.ssh/id_rsa)"
-
-# GitHub PAT para ler packages (GHCR)
-echo -n "<GH_PAT>" | gh secret set GH_PAT -R "$REPO"
-
-# Diretório do projeto na VPS (apenas o nome)
-echo -n "dsc-2025-2-aurora-platform" | gh secret set VPS_PROJECT_DIR -R "$REPO"
-```
-
-Notas:
-- O comando `gh secret set` sobrescreve o segredo se ele já existir.
-- Para `VPS_PRIVATE_KEY` use um arquivo seguro; o exemplo acima usa `--body "$(cat file)"` para enviar o conteúdo do arquivo.
-- Assegure-se de que `gh auth login` esteja configurado com uma conta que tenha permissão de escrita nos secrets do repositório.
-
-## Nota: executando os comandos diretamente na VPS (Ubuntu)
-
-Se você tentar executar os comandos `gh secret set` diretamente na VPS e receber o erro "Command 'gh' not found", instale o GitHub CLI (`gh`) na VPS antes de criar os secrets. Exemplos de instalação para Ubuntu (recomendado via repositório oficial):
-
-```bash
-# Instalar GitHub CLI (repositório oficial)
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-sudo apt update
-sudo apt install -y gh
-
-# Alternativa via snap:
-# sudo snap install gh
-
-# Verifique e autentique (se necessário):
-gh --version
-gh auth login
-```
-
-Depois da instalação e autenticação, você pode executar os mesmos comandos `echo -n ... | gh secret set ...` mostrados acima para criar os secrets.
-
-Se preferir não instalar nada na VPS, crie os secrets pela interface do GitHub no navegador: `Repository` → `Settings` → `Secrets and variables` → `Actions` → `New repository secret`.
+1. No GitHub, vá para **Settings** (do seu perfil) → **Developer settings**
+2. Clique em **Personal access tokens** → **Tokens (classic)**
+3. Clique em **Generate new token** → **Generate new token (classic)**
+4. Configure:
+   - **Note**: `AURORA_DEPLOY_VPS`
+   - **Expiration**: 90 days (ou mais)
+   - **Scopes**: ✅ `read:packages`
+5. Clique em **Generate token**
+6. **Copie imediatamente** (não será mostrado novamente!)
+7. Cole como valor do secret `GH_PAT`
 
 ---
 
-Com a VPS criada e os segredos configurados, o pipeline de CI/CD está completo.
+## Parte 3: Preparar a VPS (SSH, Docker, Git)
 
----
-
-## Parte 3: Preparação Inicial da VPS
-
-Antes que o primeiro deploy automático possa funcionar, precisamos acessar a VPS e instalar o software necessário (Git, Docker e Docker Compose).
-
-### 1. Conectar à VPS via SSH
-
-1.  Abra seu terminal local.
-2.  Use o seguinte comando para se conectar, substituindo `<SEU_VPS_HOST>` pelo endereço IP público da sua instância:
-    ```bash
-    ssh -i ~/.ssh/id_rsa ubuntu@<SEU_VPS_HOST>
-    ```
-3.  Na primeira conexão, ele perguntará se você confia no host. Digite `yes` e pressione Enter.
-
-### 2. Instalar Software e Clonar o Repositório
-
-Uma vez conectado à VPS, execute os seguintes comandos, um por um:
+### 3.1 Conectar via SSH
 
 ```bash
-# Atualiza a lista de pacotes e o sistema
+ssh ubuntu@<IP_DA_VPS>
+# Exemplo: ssh ubuntu@64.181.173.121
+```
+
+Na primeira conexão, digite `yes` quando perguntado sobre o fingerprint.
+
+### 3.2 Instalar Docker e Git
+
+Execute os comandos abaixo **na VPS**:
+
+```bash
+# Atualizar sistema
 sudo apt update && sudo apt upgrade -y
 
-# Instala Git, Docker e Docker Compose
-sudo apt install -y git docker.io docker-compose
+# Instalar Docker e Git
+sudo apt install -y git docker.io docker-compose-plugin
 
-# Adiciona seu usuário ao grupo do Docker para poder executar comandos sem 'sudo'
-sudo usermod -aG docker ${USER}
+# Adicionar usuário ao grupo docker (evita usar sudo)
+sudo usermod -aG docker $USER
 
-# Clona o repositório do projeto para o diretório home
-git clone https://github.com/seu-usuario/seu-repositorio.git /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
-
-Nota: o workflow de deploy (`deploy-to-vps.yml`) usa o segredo `VPS_PROJECT_DIR` para navegar até `/home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>` antes de executar `docker compose`. Garanta que o valor do segredo corresponda ao diretório em que o repositório foi clonado na VPS.
-
-Se o diretório não existir no servidor, você pode criá-lo e ajustar a propriedade para `ubuntu` (execute como usuário com sudo):
-
-```bash
-sudo mkdir -p /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
-sudo chown ubuntu:ubuntu /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
+# IMPORTANTE: Sair e reconectar para aplicar permissões
+exit
 ```
 
-### Teste manual do fluxo de deploy (recomendado antes de acionar o workflow)
-
-Antes de acionar o workflow `deploy-to-vps.yml`, é uma boa prática executar manualmente os mesmos comandos na VPS para validar configurações e evitar falhas no CI. Siga estes passos **como usuário `ubuntu`** na VPS.
-
-**Checklist rápido — Teste local do deploy (VPS)**
-
-- **1.** Conecte-se à VPS via SSH como `ubuntu`.
-- **2.** Confirme que `/home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>` existe e contém o repositório.
-- **3.** Verifique presença de `.env.prod` e `docker-compose.deploy.yml`.
-- **4.** Faça login no GHCR com `GH_PAT` temporário e teste `docker login ghcr.io`.
-- **5.** Execute o script helper para checagens e (opcional) deploy:
-
+Reconecte:
 ```bash
-cd /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
-chmod +x scripts/run-deploy-test.sh
-./scripts/run-deploy-test.sh --dir <SEU_DIRETORIO_DO_PROJETO> --deploy
+ssh ubuntu@<IP_DA_VPS>
 ```
 
-Siga a sequência acima antes de acionar o workflow automático; ela reproduz o que o CI fará e facilita resolução de problemas locais.
-
-1) Conectar na VPS (exemplo):
-
+Verifique a instalação:
 ```bash
-ssh -i ~/.ssh/id_rsa ubuntu@<SEU_VPS_HOST>
+docker --version
+# Docker version 24.x.x
+
+docker compose version
+# Docker Compose version v2.x.x
 ```
 
-2) Verificações iniciais
+### 3.3 Configurar Chave SSH para GitHub
+
+Para o `git pull` funcionar, configure uma chave SSH na VPS:
 
 ```bash
-# confirmar que o diretório do projeto existe
-ls -la /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
+# Gerar nova chave (sem passphrase para automação)
+ssh-keygen -t ed25519 -C "deploy@aurora" -f ~/.ssh/id_ed25519 -N ""
 
-# checar se o repositório tem o remote correto
-git -C /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO> remote get-url origin
-
-# verificar arquivos essenciais
-test -f /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>/.env.prod || echo ".env.prod não encontrado"
-test -f /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>/docker-compose.deploy.yml || echo "docker-compose.deploy.yml não encontrado"
-
-# checar docker / compose
-docker --version || echo "Docker não encontrado"
-docker compose version || echo "Docker Compose (v2) não encontrado"
-```
-
-3) Atualizar código e preparar variáveis de ambiente
-
-```bash
-cd /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
-git fetch --all
-git checkout main
-git pull origin main
-
-# exportar variáveis do .env.prod (opção 1 - conforme workflow)
-export $(grep -v '^#' .env.prod | xargs)
-
-# alternativa (mais segura se .env.prod contém espaços ou caracteres especiais):
-# set -o allexport; source .env.prod; set +o allexport
-```
-
-4) Validar o arquivo docker-compose (dry-run)
-
-```bash
-docker compose -f docker-compose.deploy.yml config >/dev/null || { echo "Erro no docker-compose.deploy.yml"; exit 1; }
-```
-
-5) Fazer login no GitHub Container Registry (GHCR)
-
-Defina o token temporariamente como variável de ambiente (`GH_PAT`) ou use o prompt interativo. NÃO deixe o token em texto claro em arquivos.
-
-```bash
-# Exemplo (substitua <OWNER> e exporte GH_PAT temporariamente)
-export GH_PAT=<seu_pat_aqui>
-echo "$GH_PAT" | docker login ghcr.io -u <OWNER> --password-stdin
-
-# (remova a variável após o teste)
-unset GH_PAT
-```
-
-6) Baixar novas imagens e reiniciar serviços
-
-```bash
-docker compose -f docker-compose.deploy.yml pull
-docker compose -f docker-compose.deploy.yml up -d
-```
-
-7) Verificar status dos serviços
-
-```bash
-docker compose -f docker-compose.deploy.yml ps
-docker ps --format "table {{.Names}}	{{.Status}}	{{.Ports}}"
-# acompanhar logs de um serviço específico
-docker compose -f docker-compose.deploy.yml logs -f <SERVICE_NAME>
-```
-
-8) Limpeza e resumo
-
-```bash
-# Se precisar parar os serviços (apenas para teste)
-docker compose -f docker-compose.deploy.yml down
-```
-
-Notas e cuidados
-- Execute os comandos como `ubuntu` (sem `sudo`) quando possível; usar `sudo` muda o contexto do usuário e das chaves SSH.
-- Se o usuário `ubuntu` não tiver permissão para rodar `docker` sem sudo, execute `sudo usermod -aG docker ubuntu` e reconecte a sessão SSH.
-- Nunca exponha `GH_PAT` em arquivos ou logs públicos. Use secrets do GitHub Actions para deploys automatizados.
-
-Se este teste manual for bem-sucedido, o workflow `deploy-to-vps.yml` deve executar os mesmos passos automaticamente quando acionado.
-
-O repositório inclui um script helper `scripts/run-deploy-test.sh` que automatiza as checagens e (opcionalmente) executa o deploy localmente na VPS. Ele deve ser executado na VPS como o usuário `ubuntu` e aceita as opções `--dir`, `--deploy`, `--down`, `--no-pull` e `--skip-git`.
-
-#### Usando o script `scripts/run-deploy-test.sh`
-
-1) Dê permissão de execução e rode o script a partir do diretório clonado (exemplo):
-
-```bash
-cd /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
-chmod +x scripts/run-deploy-test.sh
-./scripts/run-deploy-test.sh --dir <SEU_DIRETORIO_DO_PROJETO>
-```
-
-2) Para rodar as checagens e aplicar o deploy (pull + up -d):
-
-```bash
-./scripts/run-deploy-test.sh --dir <SEU_DIRETORIO_DO_PROJETO> --deploy
-```
-
-3) Para parar os serviços (docker compose down):
-
-```bash
-./scripts/run-deploy-test.sh --dir <SEU_DIRETORIO_DO_PROJETO> --down
-```
-
-Opções úteis:
-- `--no-pull` — usado com `--deploy` para evitar `docker compose pull`.
-- `--skip-git` — pula os passos de git fetch/checkout/pull.
-
-
-### Opções de autenticação (SSH recomendado)
-
-Prefira autenticar via SSH gerando uma chave na própria VPS e adicionando a chave pública no GitHub como *Deploy Key* (apenas leitura) ou como chave SSH da conta.
-
-Como fazer (execute como `ubuntu`, sem `sudo`):
-
-```bash
-# 1) Gerar chave ED25519 na VPS (sem passphrase para automação)
-ssh-keygen -t ed25519 -C "deploy@aurora" -f ~/.ssh/id_ed25519
-
-# 2) Ajustar permissões
-chmod 700 ~/.ssh
-chmod 600 ~/.ssh/id_ed25519
-chmod 644 ~/.ssh/id_ed25519.pub
-
-# 3) Copiar a chave pública e adicioná-la no GitHub
+# Exibir a chave pública
 cat ~/.ssh/id_ed25519.pub
-# Cole o conteúdo em: Repository → Settings → Deploy keys → Add deploy key
-
-# 4) Testar a autenticação SSH
-ssh -T git@github.com
-
-# 5) Clonar sem usar sudo
-rm -rf /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
-git clone git@github.com:seu-usuario/seu-repositorio.git /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
 ```
 
-Observações:
-- **Não use `sudo git clone`** — `sudo` faz o SSH usar `/root/.ssh` (root provavelmente não tem sua chave).
-- Para permitir apenas pull do repositório, use *Deploy Key* no repositório e não marque *Allow write access*.
+Copie a chave pública e adicione no GitHub:
+1. Vá para **Settings** (do repositório) → **Deploy keys**
+2. Clique em **Add deploy key**
+3. Cole a chave e marque ❌ "Allow write access" (apenas leitura)
+4. Clique em **Add key**
 
-### Alternativa: HTTPS com Personal Access Token (PAT)
+Teste a conexão:
+```bash
+ssh -T git@github.com
+# Esperado: "Hi username! You've successfully authenticated..."
+```
 
-Se preferir não configurar SSH, use HTTPS com um PAT com permissão `repo`/`read:packages` (útil para recuperar imagens do GHCR). Exemplo rápido (não recomendado deixar token em histórico):
+### 3.4 Clonar o Repositório
 
 ```bash
-export GITHUB_TOKEN=<seu_PAT>
-git clone https://$GITHUB_TOKEN@github.com/seu-usuario/seu-repositorio.git /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
-unset GITHUB_TOKEN
+cd ~
+git clone git@github.com:evertonfoz/dsc-2025-2-aurora-platform.git
+cd dsc-2025-2-aurora-platform
 ```
-
-Melhor prática: configure o token via `git credential` ou use a CLI `gh auth login`.
-
-### Complemento (menos recomendado): copiar chave privada local para a VPS
-
-É possível copiar sua chave privada do seu PC para a VPS, mas isso aumenta risco de exposição. Caso decida fazê-lo, siga estes passos com cuidado e somente se compreender os riscos:
-
-```bash
-# No seu PC local (não no VPS):
-scp ~/.ssh/id_rsa ubuntu@<VPS_IP>:/home/ubuntu/.ssh/id_rsa
-
-# No VPS (execute como ubuntu):
-chmod 600 ~/.ssh/id_rsa
-chown ubuntu:ubuntu ~/.ssh/id_rsa
-ssh -T git@github.com
-
-# Remova o arquivo do PC local se desejar (opcional):
-# shred -u ~/.ssh/id_rsa.backup
-```
-
-Aviso: copiar chaves privadas é arriscado — prefira gerar um par de chaves exclusivo na VPS ou usar *Deploy Key*.
-```
-**Importante:** Após executar `sudo usermod -aG docker ${USER}`, você precisa **sair da sessão SSH e reconectar** para que a permissão tenha efeito.
 
 ---
 
-## Parte 4: Configuração do Arquivo `.env.prod`
+## Parte 4: Configurar o `.env.prod`
 
-O arquivo `.env.prod` contém todas as variáveis de ambiente necessárias para o deploy. Este arquivo **NÃO deve ser commitado no repositório** por conter senhas e tokens sensíveis.
+O arquivo `.env.prod` contém as variáveis de ambiente sensíveis. **Nunca commite este arquivo!**
 
-### 1. Criar o arquivo `.env.prod` na VPS
-
-Conecte-se à VPS e crie o arquivo:
+### 4.1 Criar o arquivo
 
 ```bash
-ssh -i ~/.ssh/id_rsa ubuntu@<SEU_VPS_HOST>
-cd /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
+cd ~/dsc-2025-2-aurora-platform
 nano .env.prod
 ```
 
-### 2. Conteúdo do `.env.prod`
+### 4.2 Conteúdo do `.env.prod`
 
-Cole o seguinte conteúdo, substituindo os valores entre `< >`:
+Cole o seguinte conteúdo (substitua os valores marcados com `<...>`):
 
 ```bash
-# ============================================
-# CONFIGURAÇÃO DO BANCO DE DADOS (PostgreSQL)
-# ============================================
+# =============================================
+# BANCO DE DADOS
+# =============================================
 POSTGRES_USER=aurora_user
-POSTGRES_DB=aurora_db
 POSTGRES_PASSWORD=<SENHA_FORTE_AQUI>
+POSTGRES_DB=aurora_db
 
-# ============================================
-# CONFIGURAÇÃO DO REPOSITÓRIO (GHCR)
-# ============================================
-REPO_OWNER=<SEU_USUARIO_GITHUB>
+DB_HOST=db
+DB_PORT=5432
+DB_USER=aurora_user
+DB_PASS=<MESMA_SENHA_ACIMA>
+DB_NAME=aurora_db
+DB_SSL=false
+DB_LOGGING=false
+
+# =============================================
+# GITHUB CONTAINER REGISTRY
+# =============================================
+REPO_OWNER=evertonfoz
 GH_PAT=<SEU_PERSONAL_ACCESS_TOKEN>
 
-# ============================================
-# CONFIGURAÇÃO DE SEGURANÇA (JWT)
-# ============================================
-JWT_ACCESS_SECRET=<CHAVE_SECRETA_JWT_AQUI>
-JWT_EXPIRES_IN=15m
+# Tags das imagens (deixe latest)
+AUTH_IMAGE_TAG=latest
+USERS_IMAGE_TAG=latest
+EVENTS_IMAGE_TAG=latest
+REGISTRATIONS_IMAGE_TAG=latest
 
-# ============================================
-# CONFIGURAÇÃO INTER-SERVIÇOS
-# ============================================
-SERVICE_TOKEN=<TOKEN_COMUNICACAO_SERVICOS>
+# =============================================
+# SEGURANÇA (JWT)
+# =============================================
+JWT_ACCESS_SECRET=<CHAVE_SECRETA_64_CHARS>
+JWT_REFRESH_SECRET=<OUTRA_CHAVE_SECRETA_64_CHARS>
+JWT_ACCESS_EXPIRES_IN=900
 
-# ============================================
-# OPCIONAL: HASH PEPPER (segurança adicional para senhas)
-# ============================================
+# =============================================
+# COMUNICAÇÃO ENTRE SERVIÇOS
+# =============================================
+SERVICE_TOKEN=<TOKEN_32_CHARS>
 HASH_PEPPER=<VALOR_OPCIONAL>
 
-# ============================================
-# TAGS DAS IMAGENS (opcional - padrão: latest)
-# ============================================
-# AUTH_IMAGE_TAG=latest
-# USERS_IMAGE_TAG=latest
-# EVENTS_IMAGE_TAG=latest
+# URLs internas (docker network)
+USERS_API_URL=http://users-service:3011
+EVENTS_API_URL=http://events-service:3012
+AUTH_API_URL=http://auth-service:3010
+
+# =============================================
+# DESENVOLVIMENTO (remover em produção real)
+# =============================================
+DEV_AUTO_AUTH=true
 ```
 
-### 3. Gerar senhas e tokens seguros
+### 4.3 Gerar valores seguros
 
-Use os comandos abaixo para gerar valores seguros:
+Use estes comandos para gerar senhas e tokens:
 
 ```bash
-# Gerar POSTGRES_PASSWORD (48 caracteres hexadecimais)
-openssl rand -hex 24
+# POSTGRES_PASSWORD (32 chars)
+openssl rand -hex 16
 
-# Gerar JWT_ACCESS_SECRET (64 caracteres hexadecimais)
+# JWT_ACCESS_SECRET (64 chars)
 openssl rand -hex 32
 
-# Gerar SERVICE_TOKEN (32 caracteres hexadecimais)
+# JWT_REFRESH_SECRET (64 chars)
+openssl rand -hex 32
+
+# SERVICE_TOKEN (32 chars)
 openssl rand -hex 16
 ```
 
-### 4. Proteger o arquivo
+### 4.4 Proteger o arquivo
 
 ```bash
 chmod 600 .env.prod
 ```
 
-### 5. Verificar se o arquivo está correto
-
-```bash
-# Listar variáveis (sem mostrar valores sensíveis)
-grep -E "^[A-Z_]+=" .env.prod | cut -d'=' -f1
-
-# Deve mostrar:
-# POSTGRES_USER
-# POSTGRES_DB
-# POSTGRES_PASSWORD
-# REPO_OWNER
-# GH_PAT
-# JWT_ACCESS_SECRET
-# JWT_EXPIRES_IN
-# SERVICE_TOKEN
-```
-
-> ⚠️ **IMPORTANTE**: Nunca commite o arquivo `.env.prod` no Git. Ele já está no `.gitignore`.
-
 ---
 
-## Parte 4.5: Teste Local (Máquina de Desenvolvimento)
+## Parte 5: Primeiro Deploy (Manual)
 
-Antes de fazer deploy na VPS, é recomendado testar a stack Docker localmente (no seu Mac ou PC de desenvolvimento). Isso ajuda a identificar problemas de configuração antes de subir para produção.
-
-### Pré-requisitos
-
-- Docker Desktop instalado e rodando
-- Arquivo `.env.prod` preenchido no root do repositório
-- Login no GHCR (se as imagens forem privadas)
-
-### 1. Criar/verificar o arquivo `.env.prod`
-
-Crie o arquivo `.env.prod` no root do repositório com as variáveis necessárias:
+### 5.1 Login no GitHub Container Registry
 
 ```bash
-# Exemplo mínimo de .env.prod para teste local
-NODE_ENV=production
+cd ~/dsc-2025-2-aurora-platform
 
-# Postgres
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=SuaSenhaSegura123!
-POSTGRES_DB=aurora_db
+# Carregar variáveis
+export $(grep -v '^#' .env.prod | xargs)
 
-# App DB connection
-DB_HOST=db
-DB_PORT=5432
-DB_USER=postgres
-DB_PASS=SuaSenhaSegura123!
-DB_NAME=aurora_db
-DB_SSL=false
-DB_LOGGING=false
-
-# GitHub Container Registry
-REPO_OWNER=evertonfoz
-USERS_IMAGE_TAG=latest
-AUTH_IMAGE_TAG=latest
-EVENTS_IMAGE_TAG=latest
-
-# JWT
-JWT_ACCESS_SECRET=SeuSegredoJwtAqui
-JWT_REFRESH_SECRET=SeuSegredoRefreshAqui
-
-# Service token
-SERVICE_TOKEN=SeuServiceTokenAqui
-HASH_PEPPER=
-
-# URLs internas (docker network)
-USERS_API_URL=http://users-service:3011
+# Login no GHCR
+echo "$GH_PAT" | docker login ghcr.io -u $REPO_OWNER --password-stdin
+# Esperado: Login Succeeded
 ```
 
-### 2. Login no GHCR (se imagens privadas)
+### 5.2 Baixar imagens e subir containers
 
 ```bash
-export GH_PAT="<SEU_GH_PAT>"
-echo -n "$GH_PAT" | docker login ghcr.io -u evertonfoz --password-stdin
-unset GH_PAT
-```
-
-### 3. Baixar imagens e subir serviços
-
-⚠️ **Importante:** Use `--env-file .env.prod` para carregar as variáveis corretamente:
-
-```bash
-# Validar o docker-compose (dry-run)
-docker compose --env-file .env.prod -f docker-compose.deploy.yml config
-
-# Baixar imagens
-docker compose --env-file .env.prod -f docker-compose.deploy.yml pull
-
-# Subir serviços
-docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d
-```
-
-### 4. Verificar status
-
-```bash
-docker compose --env-file .env.prod -f docker-compose.deploy.yml ps
-```
-
-Saída esperada:
-```
-NAME                   STATUS                    PORTS
-aurora-auth-deploy     Up X seconds              0.0.0.0:3010->3010/tcp
-aurora-db-deploy       Up X minutes (healthy)    5432/tcp
-aurora-events-deploy   Up X seconds              0.0.0.0:3012->3012/tcp
-aurora-users-deploy    Up X seconds              0.0.0.0:3011->3011/tcp
-```
-
-### 5. Testar endpoints de health
-
-```bash
-# users-service
-curl http://localhost:3011/users/health
-
-# events-service
-curl http://localhost:3012/health
-
-# Swagger docs (abrir no navegador)
-open http://localhost:3011/docs
-open http://localhost:3012/docs
-```
-
-### 6. Ver logs
-
-```bash
-# Todos os serviços
-docker compose --env-file .env.prod -f docker-compose.deploy.yml logs -f
-
-# Serviço específico
-docker compose --env-file .env.prod -f docker-compose.deploy.yml logs -f users-service
-```
-
-### 7. Parar serviços
-
-```bash
-# Parar (preserva volumes/dados)
-docker compose --env-file .env.prod -f docker-compose.deploy.yml down
-
-# Parar E remover volumes (reseta banco)
-docker compose --env-file .env.prod -f docker-compose.deploy.yml down -v
-```
-
-### Problemas comuns no teste local
-
-#### Erro: `invalid reference format`
-
-**Causa:** Variáveis como `REPO_OWNER` não estão definidas, gerando nomes de imagem inválidos (ex: `ghcr.io//users-service:latest`).
-
-**Solução:** Use `--env-file .env.prod` em todos os comandos `docker compose`, ou exporte as variáveis no shell:
-
-```bash
-export REPO_OWNER=evertonfoz
-docker compose -f docker-compose.deploy.yml pull
-```
-
-#### Erro: `password authentication failed for user "postgres"`
-
-**Causa:** O volume do PostgreSQL foi criado com uma senha diferente da atual no `.env.prod`.
-
-**Solução:** Remover o volume e recriar (apaga dados do banco local):
-
-```bash
-docker compose --env-file .env.prod -f docker-compose.deploy.yml down -v
-docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d
-```
-
-#### Containers reiniciando em loop
-
-**Diagnóstico:**
-```bash
-docker compose --env-file .env.prod -f docker-compose.deploy.yml logs --tail 50
-```
-
-Procure por erros de conexão com banco ou variáveis faltando.
-
----
-
-## Parte 4.6: Teste de Release Bundle (Máquina de Desenvolvimento)
-
-O **Release Bundle** é um pacote distribuível contendo o `docker-compose.deploy.yml` e arquivos SQL de inicialização do banco. É o que seria enviado para produção.
-
-### Objetivo
-
-Validar que o release bundle (gerado automaticamente pelo GitHub Actions) pode ser extraído e executado em um ambiente limpo com sucesso.
-
-### Pré-requisitos
-
-- Release bundle gerado (arquivo `.tar.gz` no GitHub Releases)
-- Docker e Docker Compose disponíveis
-- Diretório limpo para teste
-
-### Procedimento
-
-#### 1. Baixar o Release Bundle
-
-```bash
-# Crie um diretório de teste
-mkdir -p ~/Downloads/aurora-release-test
-cd ~/Downloads/aurora-release-test
-
-# Baixe a release mais recente
-gh release download latest \
-  --repo evertonfoz/dsc-2025-2-aurora-platform \
-  --pattern "deploy-bundle-*.tar.gz"
-
-# Ou manualmente via curl
-curl -L -o deploy-bundle.tar.gz \
-  "https://github.com/evertonfoz/dsc-2025-2-aurora-platform/releases/download/deploy-bundle-<SHORT_SHA>/deploy-bundle-<SHORT_SHA>.tar.gz"
-```
-
-#### 2. Extrair o Bundle
-
-```bash
-tar -xzf deploy-bundle-*.tar.gz
-ls -la
-# Esperado: docker-compose.deploy.yml, postgres-init/, https/, README-deploy.md
-```
-
-#### 3. Preparar o arquivo `.env.prod`
-
-O bundle **não inclui** `.env.prod` (por segurança). Você precisa criá-lo:
-
-```bash
-cat > .env.prod << 'EOF'
-NODE_ENV=production
-
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=AuroraSecure2025!
-POSTGRES_DB=aurora_db
-
-DB_HOST=db
-DB_PORT=5432
-DB_USER=postgres
-DB_PASS=AuroraSecure2025!
-DB_NAME=aurora_db
-DB_SSL=false
-DB_LOGGING=false
-
-REPO_OWNER=evertonfoz
-USERS_IMAGE_TAG=latest
-AUTH_IMAGE_TAG=latest
-EVENTS_IMAGE_TAG=latest
-REGISTRATIONS_IMAGE_TAG=latest
-
-JWT_ACCESS_SECRET=AuroraJwtAccessSecret2025!
-JWT_REFRESH_SECRET=AuroraJwtRefreshSecret2025!
-JWT_ACCESS_EXPIRES_IN=900
-
-SERVICE_TOKEN=AuroraServiceToken2025!
-HASH_PEPPER=
-
-USERS_API_URL=http://users-service:3011
-EVENTS_API_URL=http://events-service:3012
-AUTH_API_URL=http://auth-service:3010
-
-# Para teste local: habilite auto-auth
-DEV_AUTO_AUTH=true
-EOF
-```
-
-#### 4. (Opcional) Login no GHCR se as imagens forem privadas
-
-```bash
-# Se as imagens no GHCR forem privadas, faça login
-gh auth refresh -h ghcr.io --scopes read:packages
-# Ou use um PAT:
-echo "<PERSONAL_ACCESS_TOKEN>" | docker login ghcr.io -u <USER> --password-stdin
-```
-
-#### 5. Subir a Stack
-
-```bash
-# Validar syntax (dry-run)
-docker compose --env-file .env.prod -f docker-compose.deploy.yml config > /dev/null
-
 # Baixar imagens
 docker compose --env-file .env.prod -f docker-compose.deploy.yml pull
 
 # Subir containers
 docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d
 
-# Aguardar ~10s para inicialização
-sleep 10
+# Aguardar inicialização
+sleep 15
 
 # Verificar status
 docker compose --env-file .env.prod -f docker-compose.deploy.yml ps
 ```
 
-Saída esperada:
+**Saída esperada:**
 ```
 NAME                          STATUS                PORTS
 aurora-auth-deploy            Up 10 seconds         0.0.0.0:3010->3010/tcp
-aurora-db-deploy              Up 42 seconds (healthy) 5432/tcp
+aurora-db-deploy              Up 30 seconds (healthy) 5432/tcp
 aurora-events-deploy          Up 10 seconds         0.0.0.0:3012->3012/tcp
 aurora-registrations-deploy   Up 10 seconds         0.0.0.0:3013->3013/tcp
 aurora-users-deploy           Up 10 seconds         0.0.0.0:3011->3011/tcp
 ```
 
-#### 6. Testar Endpoints
+### 5.3 Testar endpoints (internamente)
 
 ```bash
-# Health endpoints
-curl -s http://localhost:3011/users/health | jq .
-# Esperado: {"status":"ok"}
-
-curl -s http://localhost:3012/health | jq .
-# Esperado: {"status":"ok"}
-
-curl -s http://localhost:3013/registrations/health | jq .
-# Esperado: {"status":"ok"}
-
-# CRUD: Criar uma registration
-curl -s -X POST http://localhost:3013/registrations \
-  -H "Content-Type: application/json" \
-  -d '{"eventId": 1, "origin": "test"}' | jq .
-# Esperado: 201 Created, JSON com registration
-
-# CRUD: Listar registrations do usuário
-curl -s http://localhost:3013/registrations/my | jq 'length'
-# Esperado: número > 0 (pelo menos 1 criado acima)
+# Health checks (devem retornar {"status":"ok"})
+curl -s localhost:3011/users/health
+curl -s localhost:3012/health
+curl -s localhost:3013/registrations/health
 ```
 
-#### 7. Ver Logs
+### 5.4 Testar externamente
+
+Do seu computador local (não da VPS):
 
 ```bash
-# Todos os serviços
-docker compose --env-file .env.prod -f docker-compose.deploy.yml logs --tail 50
+IP_VPS="64.181.173.121"  # Substitua pelo seu IP
 
-# Serviço específico
-docker compose --env-file .env.prod -f docker-compose.deploy.yml logs --tail 30 registrations-service
+curl http://$IP_VPS:3011/users/health
+curl http://$IP_VPS:3012/health
+curl http://$IP_VPS:3013/registrations/health
 ```
 
-Procure por:
-- `Nest application successfully started` (confirmação de inicialização)
-- Sem `Error` ou `FATAL`
+> ⚠️ **Se der timeout**, veja a [Parte 9: SSH Tunnel](#parte-9-ssh-tunnel--acessar-vps-de-redes-bloqueadas)
 
-#### 8. Cleanup
+---
+
+## Parte 6: Testar Localmente (Máquina de Desenvolvimento)
+
+Antes de fazer deploy na VPS, é recomendado testar no seu computador.
+
+### 6.1 Pré-requisitos
+
+- Docker Desktop instalado e rodando
+- Arquivo `.env.prod` no diretório raiz do projeto
+
+### 6.2 Criar `.env.prod` local
 
 ```bash
-# Parar containers (preserva volumes/dados)
-docker compose --env-file .env.prod -f docker-compose.deploy.yml down
+cd ~/path/to/dsc-2025-2-aurora-platform
 
-# Ou parar E remover volumes (reseta banco)
-docker compose --env-file .env.prod -f docker-compose.deploy.yml down -v
+cat > .env.prod << 'EOF'
+NODE_ENV=production
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=LocalTest123!
+POSTGRES_DB=aurora_db
+DB_HOST=db
+DB_PORT=5432
+DB_USER=postgres
+DB_PASS=LocalTest123!
+DB_NAME=aurora_db
+DB_SSL=false
+DB_LOGGING=false
+REPO_OWNER=evertonfoz
+AUTH_IMAGE_TAG=latest
+USERS_IMAGE_TAG=latest
+EVENTS_IMAGE_TAG=latest
+REGISTRATIONS_IMAGE_TAG=latest
+JWT_ACCESS_SECRET=LocalTestJwtSecret123456789012345678901234567890
+JWT_REFRESH_SECRET=LocalTestRefreshSecret12345678901234567890123456
+JWT_ACCESS_EXPIRES_IN=900
+SERVICE_TOKEN=LocalTestServiceToken123456
+HASH_PEPPER=
+USERS_API_URL=http://users-service:3011
+DEV_AUTO_AUTH=true
+EOF
 ```
 
-### Resultado do Teste (09/12/2025)
+### 6.3 Subir a stack
 
-✅ **SUCESSO — Release Bundle funciona corretamente**
-
-- ✅ Download e extração do bundle
-- ✅ Todos 5 containers inicializados (auth, users, events, registrations, db)
-- ✅ Health endpoints respondendo 200 OK
-- ✅ CRUD operations funcionando (POST 201, GET 200)
-- ✅ Migrations executadas automaticamente
-- ✅ Database schema criado e dados persistindo
-
-**Comandos utilizados:**
 ```bash
-mkdir -p ~/Downloads/aurora-release-test && cd ~/Downloads/aurora-release-test
-# ... download e extraction ...
+# Login no GHCR (se imagens privadas)
+echo "<SEU_GH_PAT>" | docker login ghcr.io -u evertonfoz --password-stdin
+
+# Validar configuração
+docker compose --env-file .env.prod -f docker-compose.deploy.yml config > /dev/null
+
+# Baixar e subir
+docker compose --env-file .env.prod -f docker-compose.deploy.yml pull
 docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d
-# ... testing ...
+
+# Verificar
 docker compose --env-file .env.prod -f docker-compose.deploy.yml ps
 ```
 
-**Testes executados:**
-```bash
-curl -s http://localhost:3011/users/health | jq .        # ✅ {"status":"ok"}
-curl -s http://localhost:3012/health | jq .             # ✅ {"status":"ok"}
-curl -s http://localhost:3013/registrations/health | jq . # ✅ {"status":"ok"}
-
-curl -s -X POST http://localhost:3013/registrations \
-  -H "Content-Type: application/json" \
-  -d '{"eventId": 1, "origin": "test"}' | jq .           # ✅ 201 Created
-
-curl -s http://localhost:3013/registrations/my | jq 'length' # ✅ 1
-```
-
----
-
-### 1. Exportar variáveis de ambiente
+### 6.4 Testar
 
 ```bash
-cd /home/ubuntu/<SEU_DIRETORIO_DO_PROJETO>
-export $(grep -v '^#' .env.prod | xargs)
-```
-
-### 2. Login no GitHub Container Registry
-
-```bash
-echo "$GH_PAT" | docker login ghcr.io -u $REPO_OWNER --password-stdin
-```
-
-Você deve ver: `Login Succeeded`
-
-### 3. Baixar imagens e iniciar serviços
-
-```bash
-docker compose -f docker-compose.deploy.yml pull
-docker compose -f docker-compose.deploy.yml up -d
-```
-
-### 4. Verificar status dos containers
-
-```bash
-docker compose -f docker-compose.deploy.yml ps
-```
-
-Saída esperada (todos com status `Up`):
-```
-NAME                   STATUS                    PORTS
-aurora-auth-deploy     Up X seconds              0.0.0.0:3010->3010/tcp
-aurora-db-deploy       Up X minutes (healthy)    5432/tcp
-aurora-events-deploy   Up X seconds              0.0.0.0:3012->3012/tcp
-aurora-users-deploy    Up X seconds              0.0.0.0:3011->3011/tcp
-```
-
-### 5. Verificar logs dos serviços
-
-```bash
-# Ver logs de todos os serviços
-docker compose -f docker-compose.deploy.yml logs --tail 50
-
-# Ver logs de um serviço específico
-docker compose -f docker-compose.deploy.yml logs --tail 30 users-service
-```
-
-Procure por mensagens de sucesso como:
-- `Nest application successfully started`
-- `listening on port 30XX`
-
-### 6. Testar endpoints de health
-
-```bash
-# users-service
+# Health
 curl http://localhost:3011/users/health
-# Esperado: {"status":"ok"}
-
-# events-service
 curl http://localhost:3012/health
-# Esperado: {"status":"ok"}
+curl http://localhost:3013/registrations/health
 
-# auth-service (testar se responde)
-curl -s -o /dev/null -w "HTTP %{http_code}" http://localhost:3010/auth/login
-# Esperado: HTTP 400 ou 401 (endpoint existe mas precisa de credenciais)
+# Criar uma inscrição
+curl -X POST http://localhost:3013/registrations \
+  -H "Content-Type: application/json" \
+  -d '{"eventId": 1, "origin": "local-test"}'
+
+# Listar inscrições
+curl http://localhost:3013/registrations/my
 ```
 
-### 7. Testar acesso externo (do seu computador local)
-
-Após configurar a Security List da Oracle Cloud (Parte 1, seção 4), você pode testar o acesso externo diretamente do seu computador:
+### 6.5 Parar
 
 ```bash
-# Substitua <IP_VPS> pelo IP público da sua instância
-# Exemplo: 64.181.173.121
+# Parar (preserva dados)
+docker compose --env-file .env.prod -f docker-compose.deploy.yml down
 
-# users-service
-curl http://<IP_VPS>:3011/users/health
-# Esperado: {"status":"ok"}
-
-# events-service
-curl http://<IP_VPS>:3012/health
-# Esperado: {"status":"ok"}
-
-# auth-service - testar login (sem credenciais)
-curl -s -o /dev/null -w "HTTP %{http_code}" http://<IP_VPS>:3010/auth/login
-# Esperado: HTTP 400 ou 404 (endpoint existe)
-
-# auth-service - testar login com credenciais
-curl -X POST http://<IP_VPS>:3010/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "admin@aurora.com", "password": "SuaSenhaAqui"}'
-# Esperado: JSON com access_token e refresh_token
+# Parar e remover volumes (APAGA dados do banco)
+docker compose --env-file .env.prod -f docker-compose.deploy.yml down -v
 ```
-
-> **Se o teste externo falhar com timeout:**
-> 1. Verifique se a Security List está configurada (Parte 1, seção 4)
-> 2. Verifique se o iptables da VPS tem as portas abertas:
->    ```bash
->    ssh ubuntu@<IP_VPS> "sudo iptables -L INPUT -n | grep -E '301[0-2]'"
->    ```
-> 3. Se necessário, abra as portas no iptables:
->    ```bash
->    ssh ubuntu@<IP_VPS> "sudo iptables -I INPUT 5 -p tcp --dport 3010 -j ACCEPT && \
->      sudo iptables -I INPUT 5 -p tcp --dport 3011 -j ACCEPT && \
->      sudo iptables -I INPUT 5 -p tcp --dport 3012 -j ACCEPT"
->    ```
 
 ---
 
-## Parte 5.5: Teste Manual do Workflow de Deploy
+## Parte 7: Deploy Automático (CI/CD)
 
-Antes de confiar no deploy automático (acionado por commits), é importante testar o workflow `deploy-to-vps.yml` manualmente.
+### 7.1 Como funciona
 
-### Objetivo
+1. Você faz `git push` para a branch `main`
+2. Se alterou arquivos em `packages/<serviço>/**`, o workflow de build é disparado
+3. O build cria uma imagem Docker e publica no GitHub Container Registry (GHCR)
+4. Após o build, o workflow `deploy-to-vps.yml` é disparado automaticamente
+5. O deploy conecta na VPS via SSH, baixa a nova imagem e reinicia o container
 
-Validar que o workflow consegue:
-1. Conectar à VPS via SSH
-2. Atualizar o repositório (`git pull origin main`)
-3. Fazer login no GHCR
-4. Baixar as imagens mais recentes
-5. Reiniciar os containers
+### 7.2 Disparar manualmente
 
-### Pré-requisitos
+Você pode disparar o deploy manualmente:
 
-- VPS configurada e rodando (Parte 1, 2, 3 completas)
-- Todos os secrets configurados no GitHub (Parte 2)
-- `.env.prod` configurado na VPS (Parte 4)
-- GitHub CLI (`gh`) instalado localmente (opcional)
-
-### Disparar o Workflow Manualmente
-
-#### Opção A: Via GitHub CLI (recomendado)
-
+**Via GitHub CLI:**
 ```bash
-# No diretório do repositório local
 gh workflow run deploy-to-vps.yml -R evertonfoz/dsc-2025-2-aurora-platform
 ```
-
-Saída esperada:
-```
-✓ Created workflow_dispatch event for deploy-to-vps.yml at main
-```
-
-#### Opção B: Via GitHub UI
-
-1. Acesse: https://github.com/evertonfoz/dsc-2025-2-aurora-platform/actions/workflows/deploy-to-vps.yml
-2. Clique no botão **"Run workflow"** (azul, lado direito)
-3. Selecione a branch **main**
-4. Clique em **"Run workflow"** verde
-
-### Acompanhar a Execução
 
 **Via GitHub UI:**
-1. Acesse: https://github.com/evertonfoz/dsc-2025-2-aurora-platform/actions
-2. Veja a execução mais recente de "Deploy to VPS"
-3. Clique nela para ver os logs em tempo real
+1. Vá para: https://github.com/evertonfoz/dsc-2025-2-aurora-platform/actions
+2. Clique em "Deploy to VPS"
+3. Clique em "Run workflow" → "Run workflow"
 
-**Duração esperada:** 20-60 segundos
+### 7.3 Verificar execução
 
-### Verificar o Resultado
+1. Vá para **Actions** no GitHub
+2. Clique na execução mais recente
+3. Veja os logs em tempo real
 
-#### Sucesso ✅
-
-Você verá nos logs do workflow:
-
-```
-Deploy to VPS via SSH
-  Connecting to VPS...
-  Connected successfully
-  Pulling latest code...
-  Already up to date.
-  Logging into GHCR...
-  Login Succeeded
-  Pulling images...
-  ✔ auth-service Pulled
-  ✔ users-service Pulled
-  ✔ events-service Pulled
-  ✔ registrations-service Pulled
-  Starting services...
-  ✔ Container aurora-db-deploy       Healthy
-  ✔ Container aurora-auth-deploy     Started
-  ✔ Container aurora-users-deploy    Started
-  ✔ Container aurora-events-deploy   Started
-  ✔ Container aurora-registrations-deploy Started
-```
-
-**Status final:** ✅ Success (círculo verde)
-
-#### Falha ❌
-
-Se houver falha, os logs mostrarão o erro. Veja a Parte 6 (Troubleshooting) para soluções comuns.
-
-### Testar os Serviços na VPS
-
-Após o deploy bem-sucedido, teste os endpoints externamente:
-
-```bash
-# Substitua <IP_VPS> pelo IP público da sua instância
-IP_VPS="64.181.173.121"
-
-# Health endpoints
-curl http://$IP_VPS:3011/users/health
-# Esperado: {"status":"ok"}
-
-curl http://$IP_VPS:3012/health
-# Esperado: {"status":"ok"}
-
-curl http://$IP_VPS:3013/registrations/health
-# Esperado: {"status":"ok"}
-```
-
-### Resultado do Teste (09/12/2025)
-
-✅ **SUCESSO — Workflow de deploy funcionou perfeitamente**
-
-**Workflow CI/CD:**
-- ✅ Conexão SSH estabelecida com sucesso
-- ✅ `git pull origin main` executado
-- ✅ Login no GHCR bem-sucedido
-- ✅ Todas as 4 imagens baixadas (auth, users, events, registrations)
-- ✅ Containers reiniciados com sucesso
-- ⏱️ **Tempo de execução:** ~45 segundos
-
-**Comando utilizado:**
-```bash
-gh workflow run deploy-to-vps.yml -R evertonfoz/dsc-2025-2-aurora-platform
-```
-
-**Testes de Validação Pós-Deploy:**
-
-Após o deploy automático bem-sucedido, foram realizados testes manuais via SSH:
-
-```bash
-# Health endpoint interno (via SSH na VPS)
-ssh ubuntu@64.181.173.121 "curl -s localhost:3013/registrations/health"
-# Resultado: {"status":"ok"} ✅
-```
-
-**Problemas Identificados e Corrigidos:**
-
-1. **Schema `registrations` não existia** ❌ → Criado manualmente ✅
-   ```bash
-   docker exec aurora-db-deploy psql -U aurora_user -d aurora_db \
-     -c 'CREATE SCHEMA IF NOT EXISTS registrations;'
-   ```
-
-2. **Container reiniciando em loop** ❌ → Após criar schema, reiniciou normalmente ✅
-   ```bash
-   docker compose --env-file .env.prod -f docker-compose.deploy.yml restart registrations-service
-   # Status: Up
-   ```
-
-3. **Porta 3013 bloqueada no iptables** ❌ → Regra adicionada ✅
-   ```bash
-   sudo iptables -I INPUT 5 -p tcp --dport 3013 -j ACCEPT
-   ```
-
-4. **Security List da Oracle Cloud** ❌ → Atualizada de `3010-3012` para `3010-3013` ✅
-
-5. **POST retornando erro 500** ⚠️ → Causado por falta de autenticação (`DEV_AUTO_AUTH=false`)
-   - Em produção real, usar JWT tokens via `auth-service`
-   - Para testes locais, pode adicionar `DEV_AUTO_AUTH=true` temporariamente
-
-**Status Final:**
-
-| Serviço | Status | Health Endpoint (interno) | Acesso Externo |
-|---------|--------|---------------------------|----------------|
-| auth-service | ✅ Up 2 days | ✅ OK | ✅ Porta 3010 OK |
-| users-service | ✅ Up 2 days | ✅ OK | ✅ Porta 3011 OK |
-| events-service | ✅ Up 2 days | ✅ OK | ✅ Porta 3012 OK |
-| registrations-service | ✅ Up | ✅ OK | ⏳ Aguardando propagação Security List |
-| db (PostgreSQL) | ✅ Up 2 hours (healthy) | ✅ OK | N/A (interno) |
-
-**Próximos passos:** 
-- Deploy automático funciona! A cada push em `main` que modificar algum microsserviço, o build será feito e o deploy automático será acionado.
-- Aguardar 2-5 minutos para regras de Security List propagarem
-- Testar acesso externo à porta 3013 novamente
-- Em produção real: implementar autenticação JWT completa (remover `DEV_AUTO_AUTH`)
+**Tempo esperado:** 30-60 segundos
 
 ---
 
-## Parte 6: Troubleshooting - Problemas Comuns
+## Parte 8: Solução de Problemas (Troubleshooting)
 
-### Problema 1: "password authentication failed for user"
+### Problema 1: Container reiniciando em loop
 
-**Sintoma:** Os serviços NestJS falham ao conectar no banco com erro:
-```
-error: password authentication failed for user "aurora_user"
-```
-
-**Causa:** O volume do PostgreSQL foi inicializado com uma senha diferente da atual no `.env.prod`.
-
-**Solução A - Resetar a senha no banco (preserva dados):**
-
-```bash
-# Conectar no container do banco
-docker exec -it aurora-db-deploy bash
-
-# Dentro do container, conectar no psql
-psql -U $POSTGRES_USER -d $POSTGRES_DB
-
-# Alterar a senha (substitua pela senha do .env.prod)
-ALTER ROLE aurora_user WITH PASSWORD 'SUA_SENHA_DO_ENV_PROD';
-
-# Sair
-\q
-exit
-
-# Reiniciar os serviços
-docker compose -f docker-compose.deploy.yml restart users-service auth-service events-service
-```
-
-**Solução B - Recriar o volume (APAGA todos os dados):**
-
-```bash
-docker compose -f docker-compose.deploy.yml down -v
-docker compose -f docker-compose.deploy.yml up -d
-```
-
----
-
-### Problema 2: "role 'postgres' does not exist"
-
-**Sintoma:** O script de inicialização do banco falha com:
-```
-ERROR: role "postgres" does not exist
-```
-
-**Causa:** O `POSTGRES_USER` está configurado como `aurora_user`, mas o script SQL usa `AUTHORIZATION postgres`.
-
-**Solução:** Criar o role `postgres` manualmente:
-
-```bash
-docker exec -it aurora-db-deploy bash -c "
-  PGPASSWORD=\$POSTGRES_PASSWORD psql -U \$POSTGRES_USER -d \$POSTGRES_DB -c '
-    CREATE ROLE postgres WITH LOGIN;
-  '
-"
-
-# Re-executar o script de inicialização
-docker exec -it aurora-db-deploy bash -c "
-  PGPASSWORD=\$POSTGRES_PASSWORD psql -U \$POSTGRES_USER -d \$POSTGRES_DB \
-    -f /docker-entrypoint-initdb.d/01-create-db-and-schemas.sql
-"
-```
-
----
-
-### Problema 3: Container reiniciando em loop (CrashLoopBackOff)
-
-**Sintoma:** `docker compose ps` mostra containers reiniciando constantemente.
+**Sintoma:** `docker ps` mostra "Restarting (1) X seconds ago"
 
 **Diagnóstico:**
 ```bash
-# Ver logs do container problemático
-docker compose -f docker-compose.deploy.yml logs --tail 100 users-service
-
-# Ver status detalhado
-docker inspect aurora-users-deploy --format='{{.State.Status}} - {{.State.Error}}'
+docker logs aurora-<SERVICO>-deploy --tail 50
 ```
 
-**Causas comuns:**
-1. Variáveis de ambiente faltando
-2. Banco de dados não está healthy
-3. Erro na aplicação
+**Causa comum:** Schema não existe no banco
 
-**Solução - Verificar variáveis:**
+**Solução:**
 ```bash
-# Comparar variáveis do container com o esperado
-docker exec aurora-users-deploy printenv | grep -E "^(DB_|POSTGRES_)" | sort
+# Verificar schemas existentes
+docker exec aurora-db-deploy psql -U aurora_user -d aurora_db -c '\dn'
+
+# Criar schema faltante (ex: registrations)
+docker exec aurora-db-deploy psql -U aurora_user -d aurora_db \
+  -c 'CREATE SCHEMA IF NOT EXISTS registrations;'
+
+# Reiniciar serviço
+docker compose --env-file .env.prod -f docker-compose.deploy.yml restart registrations-service
 ```
 
 ---
 
-### Problema 4: Serviços não conseguem se comunicar
+### Problema 2: "password authentication failed"
 
-**Sintoma:** `auth-service` não consegue chamar `users-service`.
+**Sintoma:** Erro de autenticação no banco
+
+**Causa:** Volume do PostgreSQL foi criado com senha diferente
+
+**Solução A — Alterar senha no banco:**
+```bash
+docker exec -it aurora-db-deploy psql -U postgres -c \
+  "ALTER ROLE aurora_user WITH PASSWORD 'NovaSenhaAqui';"
+```
+
+**Solução B — Recriar volume (APAGA dados):**
+```bash
+docker compose --env-file .env.prod -f docker-compose.deploy.yml down -v
+docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d
+```
+
+---
+
+### Problema 3: Porta não acessível externamente (timeout)
+
+**Sintoma:** Funciona via `curl localhost:3013` na VPS, mas não do seu computador
 
 **Diagnóstico:**
 ```bash
-# Verificar se estão na mesma rede
-docker network inspect dsc-2025-2-aurora-platform_aurora_network
+# Na VPS, verificar se porta está escutando
+sudo ss -tlnp | grep :3013
 
-# Testar DNS interno
-docker exec aurora-auth-deploy ping -c 2 users-service
+# Verificar iptables
+sudo iptables -L INPUT -n | grep 301
 ```
 
-**Solução:** Verificar se os serviços estão na mesma network no `docker-compose.deploy.yml`.
+**Causa 1 — Falta regra no iptables:**
+```bash
+sudo iptables -I INPUT 5 -p tcp --dport 3013 -j ACCEPT
+```
+
+**Causa 2 — Security List da Oracle Cloud não liberada:**
+1. Oracle Cloud → Networking → VCN → Security Lists
+2. Editar regra de ingress para incluir porta 3013 (ou 3010-3013)
+
+**Causa 3 — Firewall da sua rede local:**
+Veja [Parte 9: SSH Tunnel](#parte-9-ssh-tunnel--acessar-vps-de-redes-bloqueadas)
 
 ---
 
-### Problema 5: "permission denied" ao executar docker
+### Problema 4: POST retorna erro 500
 
-**Sintoma:** Erro de permissão ao rodar comandos docker.
+**Sintoma:** Health funciona, mas POST `/registrations` retorna 500
+
+**Causa:** `DEV_AUTO_AUTH` não está habilitado
+
+**Solução:**
+```bash
+# Adicionar variável no .env.prod
+echo "DEV_AUTO_AUTH=true" >> ~/dsc-2025-2-aurora-platform/.env.prod
+
+# Recriar container
+cd ~/dsc-2025-2-aurora-platform
+docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d registrations-service
+```
+
+> ⚠️ **ATENÇÃO:** `DEV_AUTO_AUTH=true` é apenas para testes! Em produção real, use JWT tokens.
+
+---
+
+### Problema 5: Imagem não atualiza após deploy
+
+**Sintoma:** Código novo não aparece mesmo após deploy
+
+**Solução:**
+```bash
+docker compose --env-file .env.prod -f docker-compose.deploy.yml pull
+docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d --force-recreate
+```
+
+---
+
+### Problema 6: "permission denied" no docker
 
 **Solução:**
 ```bash
 sudo usermod -aG docker $USER
-# IMPORTANTE: Desconectar e reconectar SSH
-exit
-ssh -i ~/.ssh/id_rsa ubuntu@<VPS_HOST>
+exit  # Desconectar
+# Reconectar SSH
 ```
 
 ---
 
-### Problema 6: Schema "registrations" does not exist (registrations-service)
+## Parte 9: SSH Tunnel — Acessar VPS de Redes Bloqueadas
 
-**Sintoma:** O `registrations-service` fica reiniciando em loop com erro:
+### O Problema
 
-```
-ERROR: schema "registrations" does not exist
-code: '3F000'
-```
+Muitas redes institucionais (universidades, empresas) bloqueiam portas não-padrão (3010-3013) no firewall de saída. Isso significa que:
 
-**Causa:** O schema `registrations` não foi criado no banco. Isso acontece quando:
-- O banco já existia antes do deploy do registrations-service
-- O arquivo `postgres-init/01-create-db-and-schemas.sql` não foi executado (só roda na primeira inicialização)
+- ✅ SSH (porta 22) funciona
+- ✅ HTTP/HTTPS (portas 80/443) funcionam
+- ❌ Portas 3010-3013 são bloqueadas
 
-**Diagnóstico:**
+**Sintomas:**
+- Timeout ao acessar `http://<IP_VPS>:3011/users/health`
+- Mas funciona do celular (4G) ou de casa
 
-```bash
-# Verificar se container está reiniciando
-docker ps | grep registrations
-
-# Ver logs
-docker logs aurora-registrations-deploy --tail 30
-
-# Verificar schemas existentes
-docker exec aurora-db-deploy psql -U postgres -d aurora_db -c '\dn'
-```
-
-**Solução — Criar schema manualmente:**
+**Como diagnosticar:**
 
 ```bash
-# Descobrir o owner do banco (geralmente aurora_user ou postgres)
-docker exec aurora-db-deploy psql -U postgres -c '\l aurora_db'
+# Teste externo (do seu computador)
+curl --connect-timeout 5 http://<IP_VPS>:3011/users/health
+# Se der timeout após 5 segundos, a porta está bloqueada
 
-# Criar schema com o usuário correto
-docker exec aurora-db-deploy psql -U aurora_user -d aurora_db -c 'CREATE SCHEMA IF NOT EXISTS registrations;'
+# Teste interno (via SSH na VPS)
+ssh ubuntu@<IP_VPS> "curl -s localhost:3011/users/health"
+# Se retornar {"status":"ok"}, o serviço está funcionando
 
-# Reiniciar o serviço
-cd ~/dsc-2025-2-aurora-platform
-docker compose --env-file .env.prod -f docker-compose.deploy.yml restart registrations-service
-
-# Verificar status (deve estar "Up")
-docker ps | grep registrations
+# Conclusão: Se interno funciona e externo não, sua rede está bloqueando
 ```
 
-**Prevenção futura:** Sempre que adicionar um novo microsserviço com schema próprio, lembre-se de:
-1. Adicionar o schema no `postgres-init/01-create-db-and-schemas.sql`
-2. Se o banco já existe, criar o schema manualmente antes do primeiro deploy
+### A Solução: SSH Tunnel
 
----
+O SSH Tunnel cria um "túnel criptografado" através da porta 22 (que está liberada) e redireciona o tráfego para as portas internas da VPS.
 
-### Problema 7: Porta 3013 não acessível externamente
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  SEU COMPUTADOR              INTERNET              VPS ORACLE       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  localhost:3011  ──→  [Túnel SSH porta 22]  ──→  localhost:3011    │
+│  localhost:3012  ──→  [Túnel SSH porta 22]  ──→  localhost:3012    │
+│  localhost:3013  ──→  [Túnel SSH porta 22]  ──→  localhost:3013    │
+│                                                                     │
+│  Sua rede bloqueia 3011-3013, mas permite SSH (22)                 │
+│  O túnel "esconde" o tráfego dentro da conexão SSH                 │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
-**Sintoma:** Health endpoint funciona via SSH na VPS (`curl localhost:3013/registrations/health`) mas não funciona externamente.
+### Como Usar
 
-**Diagnóstico:**
+#### 1. Criar o túnel
+
+No seu terminal local:
 
 ```bash
-# Testar localmente na VPS (deve funcionar)
-ssh ubuntu@<VPS_HOST> "curl -s localhost:3013/registrations/health"
-
-# Testar externamente (timeout)
-curl --connect-timeout 5 http://<VPS_HOST>:3013/registrations/health
+ssh -f -N \
+  -L 3010:localhost:3010 \
+  -L 3011:localhost:3011 \
+  -L 3012:localhost:3012 \
+  -L 3013:localhost:3013 \
+  ubuntu@<IP_DA_VPS>
 ```
 
-**Causas:**
+Explicação das flags:
+- `-f`: Roda em background
+- `-N`: Não executa comando remoto (apenas túnel)
+- `-L 3011:localhost:3011`: Redireciona porta local 3011 para porta 3011 da VPS
 
-1. **Iptables da VPS não tem regra para porta 3013**
-2. **Security List da Oracle Cloud não liberada**
+#### 2. Testar os serviços
 
-**Solução A — Adicionar regra no iptables (VPS):**
+Agora você pode acessar os serviços como se estivessem rodando localmente:
 
 ```bash
-# Verificar regras atuais
-sudo iptables -L INPUT -n --line-numbers | grep 301
+# Health checks
+curl http://localhost:3011/users/health
+# {"status":"ok"}
 
-# Adicionar regra para porta 3013
-sudo iptables -I INPUT 5 -p tcp --dport 3013 -j ACCEPT
+curl http://localhost:3012/health
+# {"status":"ok"}
 
-# Verificar se foi adicionada
-sudo iptables -L INPUT -n | grep 3013
+curl http://localhost:3013/registrations/health
+# {"status":"ok"}
 
-# Salvar permanentemente (Ubuntu/Debian)
-sudo netfilter-persistent save
-```
-
-**Solução B — Atualizar Security List (Oracle Cloud):**
-
-1. Acesse: Oracle Cloud Console → **Networking** → **Virtual Cloud Networks**
-2. Clique na sua VCN (ex: `vcn-aurora-project`)
-3. Clique em **Security Lists** → selecione a default
-4. Na aba **Ingress Rules**, edite a regra existente das portas 3010-3012
-5. Mude **Destination Port Range** de `3010-3012` para `3010-3013`
-6. Clique em **Save Changes**
-
-⏱️ **Aguarde 2-5 minutos** para a regra propagar antes de testar novamente.
-
-**Teste após correção:**
-
-```bash
-# Deve retornar: {"status":"ok"}
-curl http://<VPS_HOST>:3013/registrations/health
-```
-
----
-
-### Problema 8: POST retorna erro 500 em produção (autenticação)
-
-**Sintoma:** Health endpoint funciona, mas POST `/registrations` retorna:
-
-```json
-{"statusCode":500,"message":"Internal server error","error":"Error"}
-```
-
-**Causa:** O decorator `@OwnerId()` retorna `undefined` porque não há autenticação configurada em produção (`DEV_AUTO_AUTH` não está habilitado).
-
-**Solução Temporária (apenas para testes):**
-
-Adicionar `DEV_AUTO_AUTH=true` no `.env.prod` da VPS:
-
-```bash
-# Na VPS
-echo "DEV_AUTO_AUTH=true" >> ~/dsc-2025-2-aurora-platform/.env.prod
-
-# Reiniciar o serviço
-cd ~/dsc-2025-2-aurora-platform
-docker compose --env-file .env.prod -f docker-compose.deploy.yml restart registrations-service
-```
-
-⚠️ **Importante:** `DEV_AUTO_AUTH=true` é **APENAS PARA TESTES**. Em produção real, você deve:
-
-1. Implementar autenticação JWT completa
-2. Usar tokens reais via `auth-service`
-3. Proteger endpoints com guards adequados
-4. Nunca usar `DEV_AUTO_AUTH=true` em ambientes públicos
-
-**Solução Permanente (produção real):**
-
-Implementar autenticação JWT no frontend/cliente e enviar token no header:
-
-```bash
-# Cliente envia token no header Authorization
-curl -X POST http://<VPS_HOST>:3013/registrations \
+# Criar inscrição
+curl -X POST http://localhost:3013/registrations \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <JWT_TOKEN>" \
-  -d '{"eventId": 1, "origin": "mobile-app"}'
+  -d '{"eventId": 1, "origin": "ssh-tunnel-test"}'
+# {"id":1,"userId":1,"eventId":1,"status":"pending",...}
+
+# Listar inscrições
+curl http://localhost:3013/registrations/my
+# [{"id":1,...}]
 ```
+
+#### 3. Encerrar o túnel
+
+```bash
+pkill -f "ssh -f -N -L"
+```
+
+### Exemplo Prático Completo
+
+```bash
+# 1. Criar túnel (substitua o IP)
+ssh -f -N \
+  -L 3010:localhost:3010 \
+  -L 3011:localhost:3011 \
+  -L 3012:localhost:3012 \
+  -L 3013:localhost:3013 \
+  ubuntu@64.181.173.121
+
+# 2. Verificar se o túnel está ativo
+ps aux | grep "ssh -f -N"
+# Deve mostrar o processo SSH rodando
+
+# 3. Testar serviços
+curl http://localhost:3011/users/health
+# {"status":"ok"}
+
+curl http://localhost:3013/registrations/health  
+# {"status":"ok"}
+
+# 4. Fazer operações CRUD
+curl -X POST http://localhost:3013/registrations \
+  -H "Content-Type: application/json" \
+  -d '{"eventId": 1, "origin": "meu-teste"}'
+# {"id":5,"userId":1,"eventId":1,"status":"pending","origin":"meu-teste",...}
+
+curl http://localhost:3013/registrations/my
+# [{"id":5,...}]
+
+# 5. Quando terminar, encerrar túnel
+pkill -f "ssh -f -N -L"
+```
+
+### Alternativa: Solicitar Liberação de Portas
+
+Se preferir não usar SSH Tunnel, você pode solicitar à equipe de TI da sua instituição que libere as portas. Use o modelo abaixo:
 
 ---
 
-### Problema 6: Imagens não atualizam após deploy
+**Assunto:** Solicitação de liberação de portas TCP para acesso a servidor de desenvolvimento
 
-**Sintoma:** Mesmo após `docker compose pull`, a aplicação não reflete as mudanças.
+Prezada equipe de TI,
 
-**Solução:** Forçar recriação dos containers:
-```bash
-docker compose -f docker-compose.deploy.yml up -d --force-recreate
-```
+Solicito a liberação das seguintes portas TCP no firewall de saída da rede para acesso a um servidor de desenvolvimento hospedado na Oracle Cloud Infrastructure:
+
+**Destino:** `<IP_DA_SUA_VPS>` (ex: 64.181.173.121)  
+**Portas TCP:** 3010, 3011, 3012, 3013  
+**Protocolo:** TCP  
+**Direção:** Saída (Outbound)
+
+**Justificativa:**  
+Estou desenvolvendo um projeto acadêmico (Aurora Platform) que utiliza uma arquitetura de microsserviços. O servidor na nuvem hospeda os seguintes serviços:
+
+| Porta | Serviço | Descrição |
+|-------|---------|-----------|
+| 3010 | auth-service | Serviço de autenticação |
+| 3011 | users-service | Gerenciamento de usuários |
+| 3012 | events-service | Gerenciamento de eventos |
+| 3013 | registrations-service | Gerenciamento de inscrições |
+
+**Diagnóstico realizado:**
+- Acesso via rede móvel (4G): ✅ Funcional
+- Acesso via rede institucional: ❌ Timeout (conexão bloqueada)
+- O servidor está operacional e acessível de outras redes
+
+A liberação pode ser restrita ao IP de destino específico se necessário por questões de segurança.
+
+Agradeço a atenção e fico à disposição para esclarecimentos.
+
+Atenciosamente,  
+[Seu nome]  
+[Seu departamento/curso]  
+[Seu contato]
 
 ---
 
-### Problema 7: Disco cheio
+## Apêndice: Comandos Úteis
 
-**Sintoma:** Erros de "no space left on device".
+### Gerenciamento de Containers
 
-**Solução - Limpar recursos Docker não utilizados:**
 ```bash
-# Ver uso de disco
-docker system df
+# Ver status de todos os containers
+docker compose --env-file .env.prod -f docker-compose.deploy.yml ps
 
-# Limpar imagens, containers e volumes não utilizados
-docker system prune -a --volumes
+# Ver logs (todos)
+docker compose --env-file .env.prod -f docker-compose.deploy.yml logs -f
+
+# Ver logs (específico)
+docker compose --env-file .env.prod -f docker-compose.deploy.yml logs -f registrations-service
+
+# Reiniciar um serviço
+docker compose --env-file .env.prod -f docker-compose.deploy.yml restart registrations-service
+
+# Parar tudo
+docker compose --env-file .env.prod -f docker-compose.deploy.yml down
+
+# Parar e remover volumes (CUIDADO: apaga banco!)
+docker compose --env-file .env.prod -f docker-compose.deploy.yml down -v
+
+# Forçar recriação de containers
+docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d --force-recreate
 ```
 
----
-
-### Comandos Úteis para Debug
+### Debug de Containers
 
 ```bash
-# Ver todos os containers (incluindo parados)
-docker ps -a
-
-# Ver logs em tempo real
-docker compose -f docker-compose.deploy.yml logs -f
-
 # Entrar em um container
-docker exec -it aurora-users-deploy sh
+docker exec -it aurora-registrations-deploy sh
+
+# Ver variáveis de ambiente
+docker exec aurora-registrations-deploy printenv | sort
 
 # Ver uso de recursos
 docker stats
 
-# Reiniciar um serviço específico
-docker compose -f docker-compose.deploy.yml restart users-service
+# Ver todos os containers (incluindo parados)
+docker ps -a
+```
 
-# Parar tudo
-docker compose -f docker-compose.deploy.yml down
+### Banco de Dados
 
-# Parar tudo E remover volumes (CUIDADO: apaga dados do banco)
-docker compose -f docker-compose.deploy.yml down -v
+```bash
+# Conectar no PostgreSQL
+docker exec -it aurora-db-deploy psql -U aurora_user -d aurora_db
 
-# Ver variáveis de ambiente de um container
-docker exec aurora-users-deploy printenv | sort
+# Listar schemas
+\dn
 
-# Testar conexão com o banco de dentro de um serviço
-docker exec aurora-db-deploy bash -c "PGPASSWORD=\$POSTGRES_PASSWORD psql -U \$POSTGRES_USER -d \$POSTGRES_DB -c 'SELECT version();'"
+# Listar tabelas de um schema
+\dt registrations.*
+
+# Executar query
+SELECT * FROM registrations.registrations;
+
+# Criar schema manualmente
+CREATE SCHEMA IF NOT EXISTS registrations;
+
+# Sair
+\q
+```
+
+### Rede e Firewall
+
+```bash
+# Ver portas escutando
+sudo ss -tlnp
+
+# Ver regras iptables
+sudo iptables -L INPUT -n --line-numbers
+
+# Adicionar regra iptables
+sudo iptables -I INPUT 5 -p tcp --dport 3013 -j ACCEPT
+
+# Salvar regras (persistente)
+sudo netfilter-persistent save
+
+# Testar conectividade (da VPS para ela mesma)
+curl -s localhost:3011/users/health
+```
+
+### Git e Deploy
+
+```bash
+# Atualizar código
+git pull origin main
+
+# Forçar pull (descarta mudanças locais)
+git fetch --all
+git reset --hard origin/main
+
+# Ver último commit
+git log -1 --oneline
+
+# Ver status
+git status
+```
+
+### SSH Tunnel (resumo)
+
+```bash
+# Criar túnel
+ssh -f -N -L 3010:localhost:3010 -L 3011:localhost:3011 -L 3012:localhost:3012 -L 3013:localhost:3013 ubuntu@<IP_VPS>
+
+# Verificar se está ativo
+ps aux | grep "ssh -f -N"
+
+# Encerrar túnel
+pkill -f "ssh -f -N -L"
 ```
 
 ---
 
-### Checklist de Verificação Pós-Deploy
+## Checklist Final
 
-- [ ] Todos os containers estão rodando (`docker compose ps`)
-- [ ] O banco está healthy (status `healthy`)
-- [ ] `users-service` responde em `/users/health`
-- [ ] `events-service` responde em `/health`
-- [ ] `auth-service` está aceitando requisições na porta 3010
-- [ ] Logs não mostram erros de conexão com banco
-- [ ] Variáveis sensíveis não estão expostas nos logs
+Antes de considerar o deploy completo, verifique:
+
+### Infraestrutura
+- [ ] VPS criada na Oracle Cloud com IP público
+- [ ] Security List liberando portas 3010-3013
+- [ ] Docker e Git instalados na VPS
+- [ ] Chave SSH configurada para git clone
+
+### Configuração
+- [ ] Secrets configurados no GitHub (6 secrets)
+- [ ] Repositório clonado na VPS
+- [ ] `.env.prod` configurado com senhas seguras
+- [ ] `chmod 600 .env.prod` aplicado
+
+### Containers
+- [ ] Todos os containers rodando (`docker compose ps`)
+- [ ] Banco de dados healthy
+- [ ] Todos os schemas criados (auth, users, events, registrations)
+
+### Testes
+- [ ] Health endpoints respondendo (interno via SSH)
+- [ ] Health endpoints respondendo (externo ou via SSH Tunnel)
+- [ ] CRUD funcionando (POST, GET)
+
+### CI/CD
+- [ ] Workflow de build executando corretamente
+- [ ] Workflow de deploy executando corretamente
+- [ ] Push em main dispara pipeline automaticamente
+
+---
+
+> **Última atualização:** 09/12/2025  
+> **Testado com:** Ubuntu 22.04, Docker 24.x, PostgreSQL 16, NestJS 11  
+> **Autores:** Equipe Aurora Platform
