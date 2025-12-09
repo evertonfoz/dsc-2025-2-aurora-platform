@@ -12,7 +12,7 @@ on:
 
   workflow_run:
     # Lista dos workflows que, ao terminarem, acionarão este deploy.
-    workflows: ["build-auth-service", "build-users-service", "build-events-service"]
+    workflows: ["build-auth-service", "build-users-service", "build-events-service", "build-registrations-service"]
     types:
       - completed
     branches: [main]
