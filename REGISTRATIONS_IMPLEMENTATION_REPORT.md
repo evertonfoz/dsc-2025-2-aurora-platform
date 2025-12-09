@@ -349,3 +349,94 @@ Todos os arquivos foram commitados em dois commits:
 2. **Commit 2:** Ajustes tsconfig, main.ts improvements, run-migrations.ts, docker-compose migration service.
 
 O serviço está pronto para integração contínua, smoke tests no CI, e deployment.
+
+---
+
+## Etapa 5 — Teste de Produção Local (docker-compose.deploy.yml)
+
+### Objetivo
+Validar que a stack de produção (`docker-compose.deploy.yml`) com `.env.prod` funciona corretamente localmente antes de fazer deploy na VPS.
+
+### Problemas Encontrados e Resolvidos
+
+#### Problema 1: Dockerfile CMD com path incorreto
+- **Sintoma:** Container terminava com erro `MODULE_NOT_FOUND: /usr/src/app/dist/app/src/main.js`
+- **Causa:** Dockerfile tinha `CMD ["node", "dist/app/src/main.js"]` mas tsconfig produz `dist/main.js`
+- **Solução:** Alterado para `CMD ["node", "dist/main.js"]`
+- **Arquivo:** `packages/registrations-service/Dockerfile`
+
+#### Problema 2: Schema registrations não existe
+- **Sintoma:** Migration runner falhava: `ERROR: schema "registrations" does not exist`
+- **Causa:** Docker initdb script (`postgres-init/01-create-db-and-schemas.sql`) não criava o schema registrations
+- **Solução:** Adicionado `CREATE SCHEMA IF NOT EXISTS registrations` ao script de inicialização
+- **Arquivo:** `postgres-init/01-create-db-and-schemas.sql`
+
+#### Problema 3: Migrations não executavam no deploy
+- **Sintoma:** Tabelas não eram criadas, POST/GET retornavam erro
+- **Causa:** `docker-compose.deploy.yml` não tinha comando para rodar migrations
+- **Solução:** Adicionado `command: "sh -c 'node dist/run-migrations.js && node dist/main.js'"` ao serviço
+- **Arquivo:** `docker-compose.deploy.yml`
+
+### Testes Realizados (09/12/2025 ~11:45 UTC)
+
+✅ **Teste 1: Health Endpoints**
+```
+POST http://localhost:3010/auth/health → 404 (endpoint diferente, esperado)
+GET  http://localhost:3011/users/health → 200 {"status": "ok"}
+GET  http://localhost:3012/health → 200 {"status": "ok"}
+GET  http://localhost:3013/registrations/health → 200 {"status": "ok"}
+```
+
+✅ **Teste 2: CREATE Registration**
+```
+POST http://localhost:3013/registrations
+Body: {"eventId": 1}
+Response: 201 Created
+{
+  "id": 1,
+  "userId": 1,
+  "eventId": 1,
+  "status": "pending",
+  "inscriptionDate": "2025-12-09T11:41:00.058Z",
+  "cancellationDate": null,
+  "origin": null,
+  "checkInDone": false,
+  "checkInDate": null,
+  "createdAt": "2025-12-09T11:41:00.058Z",
+  "updatedAt": "2025-12-09T11:41:00.058Z"
+}
+```
+
+✅ **Teste 3: LIST User Registrations**
+```
+GET http://localhost:3013/registrations/my
+Response: 200 OK, Array[1]
+[
+  {
+    "id": 1,
+    "userId": 1,
+    "eventId": 1,
+    "status": "pending",
+    ...
+  }
+]
+```
+
+✅ **Teste 4: CREATE Multiple Registrations**
+```
+POST /registrations {"eventId": 2} → 201, ID: 2
+POST /registrations {"eventId": 3} → 201, ID: 3
+```
+
+✅ **Teste 5: LIST Event Registrations**
+```
+GET http://localhost:3013/registrations/event/1
+Response: 200 OK, Array[1]
+```
+
+### Resultado Final
+✅ **SUCESSO**: Registrations-service em produção funciona corretamente com docker-compose.deploy.yml e .env.prod.
+
+### Commits Relacionados
+- Commit: `d6affe0` - fix: registrations-service Dockerfile CMD path and add registrations schema init + deploy migrations
+```

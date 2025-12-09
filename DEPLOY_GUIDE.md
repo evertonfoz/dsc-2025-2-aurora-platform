@@ -28,7 +28,39 @@ O pipeline de CI/CD funciona em duas etapas principais:
 | `auth-service` | 3010 | Autenticação (login, logout, refresh token) |
 | `users-service` | 3011 | Gerenciamento de usuários |
 | `events-service` | 3012 | Gerenciamento de eventos |
+| `registrations-service` | 3013 | Gerenciamento de registros/inscrições em eventos |
 | `db` (PostgreSQL) | 5432 | Banco de dados compartilhado com schemas separados |
+
+### Workflows de CI/CD
+
+Os workflows do GitHub Actions estão localizados em `.github/workflows/`:
+
+#### Build Workflows (CI)
+
+Cada microsserviço tem seu próprio workflow de build que:
+1. É disparado quando há mudanças no código do serviço ou no próprio workflow (via `paths` trigger)
+2. Compila a imagem Docker usando Docker Buildx (suporta multi-plataforma: `linux/amd64` e `linux/arm64`)
+3. Faz login no GitHub Container Registry (GHCR) usando `GITHUB_TOKEN`
+4. Publica a imagem com tags `latest`, `short-sha`, e `branch-name`
+
+**Workflows de build disponíveis:**
+- `build-auth-service.yml` — Disparado por mudanças em `packages/auth-service/**`
+- `build-users-service.yml` — Disparado por mudanças em `packages/users-service/**`
+- `build-events-service.yml` — Disparado por mudanças em `packages/events-service/**`
+- `build-registrations-service.yml` — Disparado por mudanças em `packages/registrations-service/**`
+
+#### Deploy Workflow (CD)
+
+O workflow `deploy-to-vps.yml`:
+1. É acionado **automaticamente** após a conclusão bem-sucedida de **qualquer** um dos workflows de build (via `workflow_run` trigger)
+2. Pode também ser disparado **manualmente** via `workflow_dispatch` (útil para redeployment de emergência)
+3. Conecta à VPS via SSH (usando secrets: `VPS_HOST`, `VPS_USERNAME`, `VPS_PRIVATE_KEY`, `VPS_PORT`)
+4. Executa os seguintes passos na VPS:
+   - Atualiza o repositório local com `git pull origin main`
+   - Carrega variáveis de `.env.prod`
+   - Faz login no GHCR com `GH_PAT`
+   - Baixa as imagens mais recentes
+   - Reinicia os containers com `docker compose up -d`
 
 ---
 
@@ -76,7 +108,7 @@ Se, após a criação, a instância aparecer com "Public IP address: -", siga es
 
 ### 4. Configurar Security List (Liberar Portas dos Serviços)
 
-Por padrão, a Oracle Cloud bloqueia todo o tráfego de entrada, exceto SSH (porta 22). Para acessar os serviços da Aurora Platform externamente, você precisa liberar as portas 3010-3012 na Security List da VCN.
+Por padrão, a Oracle Cloud bloqueia todo o tráfego de entrada, exceto SSH (porta 22). Para acessar os serviços da Aurora Platform externamente, você precisa liberar as portas 3010-3013 na Security List da VCN.
 
 #### Passo a passo:
 
@@ -94,8 +126,8 @@ Por padrão, a Oracle Cloud bloqueia todo o tráfego de entrada, exceto SSH (por
 | **Source CIDR** | `0.0.0.0/0` |
 | **IP Protocol** | TCP |
 | **Source Port Range** | (deixe vazio - All) |
-| **Destination Port Range** | `3010-3012` |
-| **Description** | `Aurora Platform Services (auth, users, events)` |
+| **Destination Port Range** | `3010-3013` |
+| **Description** | `Aurora Platform Services (auth, users, events, registrations)` |
 
 7.  Clique em **Add Ingress Rules**.
 

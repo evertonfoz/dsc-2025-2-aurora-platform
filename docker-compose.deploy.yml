@@ -113,6 +113,7 @@ services:
       DB_PASS: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
       SERVICE_TOKEN: ${SERVICE_TOKEN}
+    command: "sh -c 'node dist/run-migrations.js && node dist/main.js'"
     depends_on:
       db:
         condition: service_healthy
