@@ -14,6 +14,7 @@
     "migration:generate": "npm run typeorm -- migration:generate -n",
     "migration:run": "npm run typeorm -- migration:run",
     "migration:revert": "npm run typeorm -- migration:revert",
+    "migrate:js": "node dist/run-migrations.js",
     "test": "jest --runInBand --passWithNoTests"
   },
   "dependencies": {

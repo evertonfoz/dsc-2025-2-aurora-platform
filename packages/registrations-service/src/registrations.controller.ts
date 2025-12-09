@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { RegistrationsService } from './registrations.service';
 import { CreateRegistrationDto } from './dto';
-import { OwnerId } from '../../common/src/decorators/owner-id.decorator';
+import { OwnerId } from '@aurora/common';
 
 @Controller('registrations')
 export class RegistrationsController {
