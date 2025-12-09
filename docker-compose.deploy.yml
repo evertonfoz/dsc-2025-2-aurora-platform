@@ -97,6 +97,30 @@ services:
     networks:
       - aurora_network
 
+  registrations-service:
+    container_name: aurora-registrations-deploy
+    image: ghcr.io/${REPO_OWNER}/registrations-service:${REGISTRATIONS_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      NODE_ENV: production
+      PORT: 3013
+      DB_SCHEMA: registrations
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      SERVICE_TOKEN: ${SERVICE_TOKEN}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3013:3013"
+    networks:
+      - aurora_network
+
 volumes:
   pgdata:
 

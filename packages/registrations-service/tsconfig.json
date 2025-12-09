@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "commonjs",
+    "rootDir": "..",
+    "baseUrl": ".",
+    "paths": {
+      "@aurora/common": ["../common/src"],
+      "@aurora/common/*": ["../common/src/*"]
+    },
+    "outDir": "dist",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "sourceMap": true,
+    "incremental": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src", "../common/src"],
+  "exclude": ["node_modules", "dist"]
+}

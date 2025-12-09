@@ -101,6 +101,27 @@ services:
     networks:
       - aurora_network
 
+  registrations-service:
+    build:
+      context: .
+      dockerfile: ./packages/registrations-service/Dockerfile
+    container_name: aurora-registrations
+    restart: unless-stopped
+    ports:
+      - '3013:3013'
+    env_file:
+      - .env
+    environment:
+      PORT: 3013
+      NODE_ENV: development
+      DB_SCHEMA: registrations
+    depends_on:
+      db:
+        condition: service_healthy
+    command: "node dist/main.js"
+    networks:
+      - aurora_network
+
 volumes:
   pgdata:
 
