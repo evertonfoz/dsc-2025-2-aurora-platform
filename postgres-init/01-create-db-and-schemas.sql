@@ -12,8 +12,10 @@ CREATE EXTENSION IF NOT EXISTS citext;
 CREATE SCHEMA IF NOT EXISTS events AUTHORIZATION postgres;
 CREATE SCHEMA IF NOT EXISTS users AUTHORIZATION postgres;
 CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION postgres;
+CREATE SCHEMA IF NOT EXISTS registrations AUTHORIZATION postgres;
 
 -- Grant usage on schemas to postgres user (for completeness)
 GRANT ALL ON SCHEMA events TO postgres;
 GRANT ALL ON SCHEMA users TO postgres;
 GRANT ALL ON SCHEMA auth TO postgres;
+GRANT ALL ON SCHEMA registrations TO postgres;
