@@ -10,7 +10,9 @@ Este documento descreve o processo de configuração de uma máquina virtual (VM
 - [Parte 3: Preparação Inicial da VPS](#parte-3-preparação-inicial-da-vps)
 - [Parte 4: Configuração do Arquivo `.env.prod`](#parte-4-configuração-do-arquivo-envprod)
 - [Parte 4.5: Teste Local (Máquina de Desenvolvimento)](#parte-45-teste-local-máquina-de-desenvolvimento)
+- [Parte 4.6: Teste de Release Bundle (Máquina de Desenvolvimento)](#parte-46-teste-de-release-bundle-máquina-de-desenvolvimento)
 - [Parte 5: Primeiro Deploy e Validação](#parte-5-primeiro-deploy-e-validação)
+- [Parte 5.5: Teste Manual do Workflow de Deploy](#parte-55-teste-manual-do-workflow-de-deploy)
 - [Parte 6: Troubleshooting - Problemas Comuns](#parte-6-troubleshooting---problemas-comuns)
 
 ---
@@ -1098,6 +1100,130 @@ curl -X POST http://<IP_VPS>:3010/auth/login \
 >      sudo iptables -I INPUT 5 -p tcp --dport 3011 -j ACCEPT && \
 >      sudo iptables -I INPUT 5 -p tcp --dport 3012 -j ACCEPT"
 >    ```
+
+---
+
+## Parte 5.5: Teste Manual do Workflow de Deploy
+
+Antes de confiar no deploy automático (acionado por commits), é importante testar o workflow `deploy-to-vps.yml` manualmente.
+
+### Objetivo
+
+Validar que o workflow consegue:
+1. Conectar à VPS via SSH
+2. Atualizar o repositório (`git pull origin main`)
+3. Fazer login no GHCR
+4. Baixar as imagens mais recentes
+5. Reiniciar os containers
+
+### Pré-requisitos
+
+- VPS configurada e rodando (Parte 1, 2, 3 completas)
+- Todos os secrets configurados no GitHub (Parte 2)
+- `.env.prod` configurado na VPS (Parte 4)
+- GitHub CLI (`gh`) instalado localmente (opcional)
+
+### Disparar o Workflow Manualmente
+
+#### Opção A: Via GitHub CLI (recomendado)
+
+```bash
+# No diretório do repositório local
+gh workflow run deploy-to-vps.yml -R evertonfoz/dsc-2025-2-aurora-platform
+```
+
+Saída esperada:
+```
+✓ Created workflow_dispatch event for deploy-to-vps.yml at main
+```
+
+#### Opção B: Via GitHub UI
+
+1. Acesse: https://github.com/evertonfoz/dsc-2025-2-aurora-platform/actions/workflows/deploy-to-vps.yml
+2. Clique no botão **"Run workflow"** (azul, lado direito)
+3. Selecione a branch **main**
+4. Clique em **"Run workflow"** verde
+
+### Acompanhar a Execução
+
+**Via GitHub UI:**
+1. Acesse: https://github.com/evertonfoz/dsc-2025-2-aurora-platform/actions
+2. Veja a execução mais recente de "Deploy to VPS"
+3. Clique nela para ver os logs em tempo real
+
+**Duração esperada:** 20-60 segundos
+
+### Verificar o Resultado
+
+#### Sucesso ✅
+
+Você verá nos logs do workflow:
+
+```
+Deploy to VPS via SSH
+  Connecting to VPS...
+  Connected successfully
+  Pulling latest code...
+  Already up to date.
+  Logging into GHCR...
+  Login Succeeded
+  Pulling images...
+  ✔ auth-service Pulled
+  ✔ users-service Pulled
+  ✔ events-service Pulled
+  ✔ registrations-service Pulled
+  Starting services...
+  ✔ Container aurora-db-deploy       Healthy
+  ✔ Container aurora-auth-deploy     Started
+  ✔ Container aurora-users-deploy    Started
+  ✔ Container aurora-events-deploy   Started
+  ✔ Container aurora-registrations-deploy Started
+```
+
+**Status final:** ✅ Success (círculo verde)
+
+#### Falha ❌
+
+Se houver falha, os logs mostrarão o erro. Veja a Parte 6 (Troubleshooting) para soluções comuns.
+
+### Testar os Serviços na VPS
+
+Após o deploy bem-sucedido, teste os endpoints externamente:
+
+```bash
+# Substitua <IP_VPS> pelo IP público da sua instância
+IP_VPS="64.181.173.121"
+
+# Health endpoints
+curl http://$IP_VPS:3011/users/health
+# Esperado: {"status":"ok"}
+
+curl http://$IP_VPS:3012/health
+# Esperado: {"status":"ok"}
+
+curl http://$IP_VPS:3013/registrations/health
+# Esperado: {"status":"ok"}
+```
+
+### Resultado do Teste (09/12/2025)
+
+✅ **SUCESSO — Workflow de deploy funcionou perfeitamente**
+
+- ✅ Conexão SSH estabelecida com sucesso
+- ✅ `git pull origin main` executado
+- ✅ Login no GHCR bem-sucedido
+- ✅ Todas as 4 imagens baixadas (auth, users, events, registrations)
+- ✅ Containers reiniciados com sucesso
+- ✅ Todos os endpoints respondendo 200 OK
+
+**Tempo de execução:** ~45 segundos
+
+**Comando utilizado:**
+```bash
+gh workflow run deploy-to-vps.yml -R evertonfoz/dsc-2025-2-aurora-platform
+```
+
+**Próximos passos:** Deploy automático agora funciona! A cada push em `main` que modificar algum microsserviço, o build será feito e o deploy automático será acionado.
 
 ---
 
