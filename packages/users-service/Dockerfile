@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /usr/src/app
 
 # copy the local common package into the image so npm can resolve file:../common
@@ -19,7 +19,7 @@ RUN npm install --no-package-lock
 COPY packages/users-service .
 RUN npm run build
 
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 WORKDIR /usr/src/app
 
 # copy package.json so npm commands in compose can run (compose overrides command)
