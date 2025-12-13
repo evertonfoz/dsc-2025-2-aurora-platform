@@ -17,7 +17,7 @@ import { AuthTokenRevocationValidator } from './token-revocation.validator';
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
       secret: process.env.JWT_ACCESS_SECRET ?? 'dev_access_secret',
-      signOptions: { expiresIn: 900 },
+      signOptions: { expiresIn: Number(process.env.JWT_ACCESS_EXPIRES_IN) ?? 900 },
     }),
   ],
   controllers: [AuthController],

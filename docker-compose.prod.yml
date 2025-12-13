@@ -1,9 +1,10 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:16
     restart: unless-stopped
+    # IMPORTANT: If you change DB credentials in .env.prod, you MUST remove the volume:
+    #   docker compose -f docker-compose.prod.yml down -v
+    # Otherwise, Postgres will keep using the old credentials from the existing volume.
     env_file:
       - .env.prod
     environment:
@@ -82,6 +83,27 @@ services:
       DB_USER: ${POSTGRES_USER}
       DB_PASS: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - aurora_network
+
+  registrations-service:
+    image: ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/registrations-service:${REGISTRATIONS_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      NODE_ENV: production
+      PORT: 3013
+      DB_SCHEMA: registrations
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      SERVICE_TOKEN: ${SERVICE_TOKEN}
     depends_on:
       db:
         condition: service_healthy

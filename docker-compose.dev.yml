@@ -1,14 +1,18 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:16
     container_name: aurora_db
     restart: unless-stopped
+    # Load credentials from .env file to ensure consistency
+    # IMPORTANT: If you change DB credentials in .env, you MUST remove the volume:
+    #   docker compose -f docker-compose.dev.yml down -v
+    # Otherwise, Postgres will keep using the old credentials from the existing volume.
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: aurora_db
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASS:-postgres}
+      POSTGRES_DB: ${DB_NAME:-aurora_db}
     ports:
       - '5432:5432'
     volumes:
@@ -100,6 +104,27 @@ services:
         condition: service_healthy
     # do not mount local source nor override command so the image runs the compiled Nest app
     command: "npm run start:prod"
+    networks:
+      - aurora_network
+
+  registrations-service:
+    build:
+      context: .
+      dockerfile: ./packages/registrations-service/Dockerfile
+    container_name: aurora_registrations_service
+    restart: unless-stopped
+    ports:
+      - '3013:3013'
+    env_file:
+      - .env
+    environment:
+      DB_SCHEMA: registrations
+      PORT: 3013
+      NODE_ENV: development
+    depends_on:
+      db:
+        condition: service_healthy
+    command: node dist/main.js
     networks:
       - aurora_network
 

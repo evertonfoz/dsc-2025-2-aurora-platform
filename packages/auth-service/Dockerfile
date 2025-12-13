@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /usr/src/app
 
@@ -14,13 +14,14 @@ RUN npm run build
 WORKDIR /usr/src/app
 COPY packages/auth-service/package.json ./
 COPY packages/auth-service/package-lock.json ./
-RUN npm ci
+# use npm install to avoid strict lockfile mismatch in local dev builds
+RUN npm install --no-package-lock
 
 # copy source and build
 COPY packages/auth-service .
 RUN npm run build || true
 
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 
 WORKDIR /usr/src/app
 
