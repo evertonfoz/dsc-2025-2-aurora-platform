@@ -41,8 +41,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "3011:3011"
     networks:
       - aurora_network
 
@@ -69,8 +67,6 @@ services:
         condition: service_healthy
       users-service:
         condition: service_started
-    ports:
-      - "3010:3010"
     networks:
       - aurora_network
 
@@ -92,8 +88,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "3012:3012"
     networks:
       - aurora_network
 
@@ -117,8 +111,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "3013:3013"
     networks:
       - aurora_network
 

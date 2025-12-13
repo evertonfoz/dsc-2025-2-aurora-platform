@@ -17,6 +17,8 @@ chmod +x scripts/run-deploy-test.sh
 
 Esses passos reproduzem o fluxo do workflow `deploy-to-vps.yml` e são úteis para validar tudo localmente antes de acionar o CI.
 
+> Nota: em produção/stage os serviços de aplicação não expõem portas diretamente; o acesso externo deve passar pelo gateway/ingress (reverse proxy). No compose de produção, os containers rodam apenas na rede interna `aurora_network`.
+
 ## 1) Criar os secrets no GitHub (execute localmente)
 
 ```bash
