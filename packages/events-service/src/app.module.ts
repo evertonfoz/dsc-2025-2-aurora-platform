@@ -35,8 +35,10 @@ import { HealthController } from './health/health.controller';
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        ttl: Number(config.get<number>('RATE_LIMIT_TTL')) ?? 60,
-        limit: Number(config.get<number>('RATE_LIMIT_LIMIT')) ?? 100,
+        throttlers: [{
+          ttl: (Number(config.get<number>('RATE_LIMIT_TTL')) ?? 60) * 1000, // Convert seconds to milliseconds for v6
+          limit: Number(config.get<number>('RATE_LIMIT_LIMIT')) ?? 100,
+        }],
       }),
     }),
     CommonModule,
@@ -65,7 +67,8 @@ import { HealthController } from './health/health.controller';
           migrationsRun: true,
           synchronize: false,
           logging: config.get<string>('DB_LOGGING') === 'true',
-          extra: { options: `-c search_path=${schema}` },
+          // Include public schema in search_path for citext extension
+          extra: { options: `-c search_path=${schema},public` },
         };
       },
     }),

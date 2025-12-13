@@ -35,8 +35,10 @@ import { UsersModule } from './users.module';
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        ttl: Number(config.get<number>('RATE_LIMIT_TTL')) ?? 60,
-        limit: Number(config.get<number>('RATE_LIMIT_LIMIT')) ?? 100,
+        throttlers: [{
+          ttl: (Number(config.get<number>('RATE_LIMIT_TTL')) ?? 60) * 1000, // Convert seconds to milliseconds for v6
+          limit: Number(config.get<number>('RATE_LIMIT_LIMIT')) ?? 100,
+        }],
       }),
     }),
     CommonModule,

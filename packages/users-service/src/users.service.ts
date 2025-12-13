@@ -33,40 +33,46 @@ export class UsersService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     // ensure two seeded users for backward compatibility with auth-service tests
-    const adminEmail = 'admin.user@example.com';
-    const testEmail = 'test.user@example.com';
-    const pepper = process.env.HASH_PEPPER ?? '';
+    // Wrap in try-catch to avoid crashing if migrations haven't run yet
+    try {
+      const adminEmail = 'admin.user@example.com';
+      const testEmail = 'test.user@example.com';
+      const pepper = process.env.HASH_PEPPER ?? '';
 
-    const existingAdmin = await this.repo.findOne({
-      where: { email: ILike(adminEmail) } as any,
-    });
-    if (!existingAdmin) {
-      const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash('AdminP@ss1' + pepper, salt);
-      const admin = this.repo.create({
-        name: 'Admin User',
-        email: adminEmail,
-        passwordHash,
-        role: 'admin',
-      } as any);
-      await this.repo.save(admin);
-      console.log('[UsersService] Seeded admin user: admin.user@example.com');
-    }
+      const existingAdmin = await this.repo.findOne({
+        where: { email: ILike(adminEmail) } as any,
+      });
+      if (!existingAdmin) {
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash('AdminP@ss1' + pepper, salt);
+        const admin = this.repo.create({
+          name: 'Admin User',
+          email: adminEmail,
+          passwordHash,
+          role: 'admin',
+        } as any);
+        await this.repo.save(admin);
+        console.log('[UsersService] Seeded admin user: admin.user@example.com');
+      }
 
-    const existingTest = await this.repo.findOne({
-      where: { email: ILike(testEmail) } as any,
-    });
-    if (!existingTest) {
-      const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash('StrongP@ssw0rd' + pepper, salt);
-      const testUser = this.repo.create({
-        name: 'Test User',
-        email: testEmail,
-        passwordHash,
-        role: 'student',
-      } as any);
-      await this.repo.save(testUser);
-      console.log('[UsersService] Seeded test user: test.user@example.com');
+      const existingTest = await this.repo.findOne({
+        where: { email: ILike(testEmail) } as any,
+      });
+      if (!existingTest) {
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash('StrongP@ssw0rd' + pepper, salt);
+        const testUser = this.repo.create({
+          name: 'Test User',
+          email: testEmail,
+          passwordHash,
+          role: 'student',
+        } as any);
+        await this.repo.save(testUser);
+        console.log('[UsersService] Seeded test user: test.user@example.com');
+      }
+    } catch (error) {
+      // Log warning but don't crash - migrations may not have run yet
+      console.warn('[UsersService] Could not seed users (tables may not exist yet):', error.message);
     }
   }
 

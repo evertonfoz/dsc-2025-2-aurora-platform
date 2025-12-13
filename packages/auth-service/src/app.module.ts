@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
+// Use runtime require for ConfigModule to avoid TS named-export resolution issues
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { ConfigModule } = require('@nestjs/config');
 import Joi from 'joi';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth.module';
@@ -35,8 +38,10 @@ import { AuthModule } from './auth.module';
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        ttl: Number(config.get<number>('RATE_LIMIT_TTL')) ?? 60,
-        limit: Number(config.get<number>('RATE_LIMIT_LIMIT')) ?? 100,
+        throttlers: [{
+          ttl: (Number(config.get<number>('RATE_LIMIT_TTL')) ?? 60) * 1000, // Convert seconds to milliseconds for v6
+          limit: Number(config.get<number>('RATE_LIMIT_LIMIT')) ?? 100,
+        }],
       }),
     }),
     TypeOrmModule.forRootAsync({
