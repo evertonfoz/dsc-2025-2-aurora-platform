@@ -23,6 +23,9 @@ echo "  users:           ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/users-service:${US
 echo "  auth:            ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/auth-service:${AUTH_TAG}"
 echo "  events:          ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/events-service:${EVENTS_TAG}"
 echo "  registrations:   ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/registrations-service:${REGISTRATIONS_TAG}"
+echo ""
+echo "NOTA: Este script faz deploy LOCAL (docker compose)."
+echo "Para deploy na VPS, use o workflow: .github/workflows/deploy-to-vps.yml"
 
 if [ ! -f .env.prod ]; then
   if [ -f .env.prod.example ]; then

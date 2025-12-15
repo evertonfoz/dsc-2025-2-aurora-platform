@@ -50,7 +50,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ghcr.io/${{ github.repository_owner }}/auth-service
+          images: ghcr.io/${{ github.repository }}/auth-service
           # Gera tags automaticamente: 'main', 'latest' e o hash do commit
           tags: |
             type=ref,event=branch
