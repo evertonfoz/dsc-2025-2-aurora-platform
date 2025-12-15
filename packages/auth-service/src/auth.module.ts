@@ -10,6 +10,7 @@ import { AuthService } from './auth.service';
 import { UsersHttpClient } from './users-http.client';
 import { AuthController } from './auth.controller';
 import { AuthTokenRevocationValidator } from './token-revocation.validator';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { AuthTokenRevocationValidator } from './token-revocation.validator';
       signOptions: { expiresIn: Number(process.env.JWT_ACCESS_EXPIRES_IN) ?? 900 },
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, HealthController],
   providers: [
     // Provide a simple in-memory mock repository for tests so DI resolves
     ...(process.env.NODE_ENV === 'test'
