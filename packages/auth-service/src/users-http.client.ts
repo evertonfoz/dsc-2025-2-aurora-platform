@@ -19,7 +19,8 @@ export class UsersHttpClient {
   constructor() {
     this.baseUrl = process.env.USERS_API_URL ?? 'http://users-service:3011';
     this.serviceToken = process.env.SERVICE_TOKEN ?? '';
-    if (!this.serviceToken) {
+    // Allow tests to run without SERVICE_TOKEN; enforce in non-test environments
+    if (!this.serviceToken && process.env.NODE_ENV !== 'test') {
       throw new Error('SERVICE_TOKEN is required for internal user calls');
     }
     this.client = axios.create({

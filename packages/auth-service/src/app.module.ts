@@ -23,11 +23,11 @@ import { AuthModule } from './auth.module';
         DB_NAME: Joi.string().default('aurora_db'),
         DB_SCHEMA: Joi.string().default('auth'),
         DB_LOGGING: Joi.string().valid('true', 'false').default('false'),
-        SERVICE_TOKEN: Joi.string().required(),
+        SERVICE_TOKEN: Joi.when('NODE_ENV', { is: 'test', then: Joi.string().optional(), otherwise: Joi.string().required() }),
         USERS_API_URL: Joi.string()
           .uri({ scheme: ['http', 'https'] })
           .default('http://users-service:3011'),
-        JWT_ACCESS_SECRET: Joi.string().required(),
+        JWT_ACCESS_SECRET: Joi.when('NODE_ENV', { is: 'test', then: Joi.string().optional(), otherwise: Joi.string().required() }),
         JWT_REFRESH_SECRET: Joi.string().optional(),
         JWT_ACCESS_EXPIRES_IN: Joi.string().default('900'),
         RATE_LIMIT_TTL: Joi.number().default(60),
@@ -47,6 +47,19 @@ import { AuthModule } from './auth.module';
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
+        // In test environment use in-memory sqlite to avoid external DB dependency
+        const nodeEnv = process.env.NODE_ENV ?? config.get<string>('NODE_ENV') ?? 'development';
+        if (nodeEnv === 'test') {
+          return {
+            type: 'sqlite',
+            database: ':memory:',
+            // avoid loading entities in tests to prevent DB-specific type errors
+            entities: [],
+            synchronize: false,
+            logging: false,
+          } as any;
+        }
+
         const schema = config.get<string>('DB_SCHEMA') ?? 'auth';
         return {
           type: 'postgres',
