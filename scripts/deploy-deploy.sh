@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Helper para subir o compose de deploy (deploy-only).
+# - Puxa imagens (tags via env ou 'latest')
+# - (Opcional) verifica assinatura com cosign se COSIGN_VERIFY=true
+# - Garante .env.prod (copia de .env.prod.example se não existir)
+# - Executa docker compose -f docker-compose.deploy.yml up -d
+# - Faz health básico nas portas expostas (dev/teste)
+
+REPO_OWNER=${REPO_OWNER:-"evertonfoz"}
+USERS_TAG=${USERS_IMAGE_TAG:-"latest"}
+AUTH_TAG=${AUTH_IMAGE_TAG:-"latest"}
+EVENTS_TAG=${EVENTS_IMAGE_TAG:-"latest"}
+COSIGN_VERIFY=${COSIGN_VERIFY:-"false"}
+
+echo "[deploy-deploy] usando imagens:"
+echo "  users:   ghcr.io/${REPO_OWNER}/users-service:${USERS_TAG}"
+echo "  auth:    ghcr.io/${REPO_OWNER}/auth-service:${AUTH_TAG}"
+echo "  events:  ghcr.io/${REPO_OWNER}/events-service:${EVENTS_TAG}"
+
+if [ ! -f .env.prod ]; then
+  if [ -f .env.prod.example ]; then
+    echo ".env.prod não encontrado — copiando de .env.prod.example"
+    cp .env.prod.example .env.prod
+    echo "ATENÇÃO: edite .env.prod e substitua segredos (JWT_ACCESS_SECRET, credenciais DB, etc.)"
+    read -p "Deseja abrir .env.prod agora em nano? (s/N) " OPEN
+    if [[ "$OPEN" =~ ^([sS]|[yY])$ ]]; then
+      nano .env.prod
+    fi
+  else
+    echo "Arquivo .env.prod.example não existe. Saindo." >&2
+    exit 1
+  fi
+fi
+
+docker pull ghcr.io/${REPO_OWNER}/users-service:${USERS_TAG}
+docker pull ghcr.io/${REPO_OWNER}/auth-service:${AUTH_TAG}
+docker pull ghcr.io/${REPO_OWNER}/events-service:${EVENTS_TAG}
+
+if [ "$COSIGN_VERIFY" = "true" ]; then
+  if ! command -v cosign >/dev/null 2>&1; then
+    echo "COSIGN_VERIFY=true mas cosign não está instalado. Instale cosign para verificação." >&2
+    exit 1
+  fi
+  echo "Verificando assinaturas com cosign..."
+  cosign verify --key cosign.pub ghcr.io/${REPO_OWNER}/users-service:${USERS_TAG}
+  cosign verify --key cosign.pub ghcr.io/${REPO_OWNER}/auth-service:${AUTH_TAG}
+  cosign verify --key cosign.pub ghcr.io/${REPO_OWNER}/events-service:${EVENTS_TAG}
+fi
+
+echo "Subindo com docker compose (deploy-only)"
+docker compose -f docker-compose.deploy.yml up -d
+
+echo "Aguardando serviços ficarem saudáveis (aguarde alguns segundos)"
+sleep 8
+
+health() {
+  URL=$1
+  if curl -sfS "$URL" >/dev/null; then
+    echo "OK: $URL"
+    return 0
+  else
+    echo "FALHA: $URL"
+    return 1
+  fi
+}
+
+echo "Testando endpoints de health (localhost:3010/3011/3012)"
+health http://localhost:3010/auth/me || echo "  (401 esperado - auth requer token)"
+health http://localhost:3011/users/health || true
+health http://localhost:3012/health || true
+
+echo "Deploy (compose deploy) concluído. Verifique logs se necessário."

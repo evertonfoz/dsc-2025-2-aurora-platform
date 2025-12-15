@@ -40,4 +40,6 @@ O objetivo do deploy bundle é entregar à equipe de operações (ops) apenas os
 
 ***
 
-Se quiser, eu já crio também um pequeno `scripts/deploy-prod.sh` (pronto) para rodar no host — já adicionei uma versão simples no repo. Posso evoluir para verificar assinaturas e automações extras conforme desejar.
+Scripts disponíveis:
+- `scripts/deploy-prod.sh`: usa `docker-compose.prod.yml` + `.env.prod` para subir o stack de produção.
+- `scripts/deploy-deploy.sh`: helper para o compose de deploy (imagens pré-buildadas).

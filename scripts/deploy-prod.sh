@@ -1,23 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Small deploy helper for operators.
-# - Puxa imagens (tags fornecidas via env vars ou usa 'latest')
-# - (Opcional) verifica assinatura com cosign se COSIGN_VERIFY=true
-# - Cria .env.prod a partir de .env.prod.example (se não existir) com prompts
-# - Executa docker compose -f docker-compose.deploy.yml up -d
-# - Roda health checks rápidos
+# Deploy helper para produção (compose prod).
+# - Usa docker-compose.prod.yml
+# - Requer .env.prod (copia de exemplo se faltar)
+# - Puxa imagens (opcional: --no-pull) e sobe com compose
+# - Health básico via exec (interno) opcional
 
-REPO_OWNER=${REPO_OWNER:-"evertonfoz"}
+set -euo pipefail
+
+GITHUB_ORG=${GITHUB_ORG:-"evertonfoz"}
+GITHUB_REPO=${GITHUB_REPO:-"dsc-2025-2-aurora-platform"}
 USERS_TAG=${USERS_IMAGE_TAG:-"latest"}
 AUTH_TAG=${AUTH_IMAGE_TAG:-"latest"}
 EVENTS_TAG=${EVENTS_IMAGE_TAG:-"latest"}
+REGISTRATIONS_TAG=${REGISTRATIONS_IMAGE_TAG:-"latest"}
+PULL_IMAGES=${PULL_IMAGES:-"true"}
 COSIGN_VERIFY=${COSIGN_VERIFY:-"false"}
 
 echo "[deploy-prod] usando imagens:"
-echo "  users:   ghcr.io/${REPO_OWNER}/users-service:${USERS_TAG}"
-echo "  auth:    ghcr.io/${REPO_OWNER}/auth-service:${AUTH_TAG}"
-echo "  events:  ghcr.io/${REPO_OWNER}/events-service:${EVENTS_TAG}"
+echo "  users:           ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/users-service:${USERS_TAG}"
+echo "  auth:            ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/auth-service:${AUTH_TAG}"
+echo "  events:          ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/events-service:${EVENTS_TAG}"
+echo "  registrations:   ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/registrations-service:${REGISTRATIONS_TAG}"
 
 if [ ! -f .env.prod ]; then
   if [ -f .env.prod.example ]; then
@@ -34,10 +39,12 @@ if [ ! -f .env.prod ]; then
   fi
 fi
 
-# Pull imagens
-docker pull ghcr.io/${REPO_OWNER}/users-service:${USERS_TAG}
-docker pull ghcr.io/${REPO_OWNER}/auth-service:${AUTH_TAG}
-docker pull ghcr.io/${REPO_OWNER}/events-service:${EVENTS_TAG}
+if [ "$PULL_IMAGES" = "true" ]; then
+  docker pull ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/users-service:${USERS_TAG}
+  docker pull ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/auth-service:${AUTH_TAG}
+  docker pull ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/events-service:${EVENTS_TAG}
+  docker pull ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/registrations-service:${REGISTRATIONS_TAG}
+fi
 
 if [ "$COSIGN_VERIFY" = "true" ]; then
   if ! command -v cosign >/dev/null 2>&1; then
@@ -45,31 +52,24 @@ if [ "$COSIGN_VERIFY" = "true" ]; then
     exit 1
   fi
   echo "Verificando assinaturas com cosign..."
-  cosign verify --key cosign.pub ghcr.io/${REPO_OWNER}/users-service:${USERS_TAG}
-  cosign verify --key cosign.pub ghcr.io/${REPO_OWNER}/auth-service:${AUTH_TAG}
-  cosign verify --key cosign.pub ghcr.io/${REPO_OWNER}/events-service:${EVENTS_TAG}
+  cosign verify --key cosign.pub ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/users-service:${USERS_TAG}
+  cosign verify --key cosign.pub ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/auth-service:${AUTH_TAG}
+  cosign verify --key cosign.pub ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/events-service:${EVENTS_TAG}
+  cosign verify --key cosign.pub ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/registrations-service:${REGISTRATIONS_TAG}
 fi
 
-echo "Subindo com docker compose (deploy-only)"
-docker compose -f docker-compose.deploy.yml up -d
+echo "Subindo com docker compose (prod)"
+docker compose --env-file .env.prod \
+  -f docker-compose.prod.yml \
+  up -d
 
-echo "Aguardando serviços ficarem saudáveis (aguarde alguns segundos)"
-sleep 8
+echo "Status pós-subida:"
+docker compose --env-file .env.prod -f docker-compose.prod.yml ps
 
-function health() {
-  URL=$1
-  if curl -sfS "$URL" >/dev/null; then
-    echo "OK: $URL"
-    return 0
-  else
-    echo "FALHA: $URL"
-    return 1
-  fi
-}
+echo "Dica: para checar health internamente:"
+echo "  docker compose --env-file .env.prod -f docker-compose.prod.yml exec events-service curl -sf http://127.0.0.1:3012/health"
+echo "  docker compose --env-file .env.prod -f docker-compose.prod.yml exec registrations-service curl -sf http://127.0.0.1:3013/registrations/health"
+echo "  docker compose --env-file .env.prod -f docker-compose.prod.yml exec auth-service curl -sf http://127.0.0.1:3010/health || true"
+echo "  docker compose --env-file .env.prod -f docker-compose.prod.yml exec users-service curl -sf http://127.0.0.1:3011/health || true"
 
-echo "Testando endpoints de health (localhost:3010/3011/3012)"
-health http://localhost:3010/auth/me || echo "  (401 esperado - auth requer token)"
-health http://localhost:3011/users/health || true
-health http://localhost:3012/health || true
-
-echo "Deploy concluído (verificar logs e métricas)."
+echo "Deploy (compose prod) concluído. Use logs/health para confirmar."

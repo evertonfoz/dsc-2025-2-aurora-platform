@@ -72,4 +72,6 @@ Se quiser, posso adicionar um script `scripts/deploy-prod.sh` que faz:
 - aplicar migrações (opcional)
 - enviar notificações (opcional)
 
+Status atual: `scripts/deploy-prod.sh` já existe e usa `docker-compose.prod.yml` com `.env.prod`. Para subir o compose de deploy (sem build), use `scripts/deploy-deploy.sh`.
+
 Deseja que eu gere esse script também?

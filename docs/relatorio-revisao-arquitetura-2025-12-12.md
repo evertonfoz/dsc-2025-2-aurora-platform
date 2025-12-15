@@ -199,6 +199,26 @@
         ```
       - **Lição aprendida:** `rootDir` no tsconfig influencia a estrutura de diretórios no `outDir`. Sempre validar que scripts npm apontam para o caminho correto após mudanças no tsconfig.
 
+## Execução 15/12/2025 — Teste do docker-compose.deploy (ploy)
+- Issue dedicada: `docs/issues/2025-12-15-testes-compose-deploy.md`; branch `issue/2025-12-15-testes-compose-deploy`.
+- Derrubamos o stack de dev com `docker compose -f docker-compose.dev.yml down` para liberar portas/recursos antes do teste de deploy.
+- 1ª tentativa de `docker compose -f docker-compose.deploy.yml up -d` falhou por variáveis não exportadas no shell (imagens com `REPO_OWNER` vazio) e senha de Postgres divergente; `registrations-service` reiniciava com `28P01 password authentication failed for user "postgres"`.
+- Reset do volume e reconfiguração: `docker compose -f docker-compose.deploy.yml down -v` para limpar `pgdata` e nova subida com `set -a; source .env.prod; set +a; docker compose -f docker-compose.deploy.yml up -d`.
+- Resultado: containers `aurora-db-deploy` (healthy), `aurora-auth-deploy`, `aurora-users-deploy`, `aurora-events-deploy`, `aurora-registrations-deploy` em `Up`; logs do registrations confirmam migrações aplicadas com sucesso. Containers externos `classhero_*` mantidos.
+- Health checks internos (via `docker compose exec ... node -e http.get(...)`):  
+  - events-service: `GET http://127.0.0.1:3012/health` → 200 `{"status":"ok"}`  
+  - registrations-service: `GET http://127.0.0.1:3013/registrations/health` → 200 `{"status":"ok"}`  
+  - auth-service e users-service: `GET /health` retornam 404 (não implementado), indicando apenas que estão respondendo.
+
+## Caso pedagógico 05 — Endpoints de health ausentes em auth-service e users-service
+
+- **Problema identificado:** os serviços auth-service e users-service respondiam 404 em `/health` durante o teste do compose de deploy, dificultando checagem de disponibilidade.
+- **Impacto potencial:** ausência de liveness/readiness padronizados impede automações de deploy/observabilidade e dificulta smoke tests.
+- **Solução aplicada (15/12/2025):**
+  - auth-service: criado `packages/auth-service/src/health.controller.ts` e registrado no `AuthModule`.
+  - users-service: criado `packages/users-service/src/health.controller.ts` e registrado no `UsersModule`.
+- **Efeito prático:** ambos os serviços agora respondem `200 {"status":"ok"}` em `/health`, alinhando com events/registrations e permitindo monitoramento básico.
+
   11. **Docker build cache - Compilação incremental do TypeScript:**
       - **Problema:** Mesmo usando `docker build --no-cache`, o código compilado dentro do container estava desatualizado. Mudanças no código fonte TypeScript não apareciam no build final.
       - **Causa raiz:** O `.dockerignore` bloqueia `dist/`, mas o tsconfig tinha `incremental: true`, criando `tsconfig.tsbuildinfo` que persistia localmente. O Docker copiava código fonte, mas a compilação incremental reutilizava cache antigo.
