@@ -32,7 +32,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ghcr.io/${{ github.repository_owner }}/registrations-service
+          images: ghcr.io/${{ github.repository }}/registrations-service
           tags: |
             type=ref,event=branch
             type=sha
