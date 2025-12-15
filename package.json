@@ -19,6 +19,7 @@
     "start:debug": "npm -ws run start:debug --if-present",
     "start:prod": "npm -ws run start:prod --if-present",
     "lint": "npm -ws run lint --if-present",
+    "lint:all": "eslint \"packages/**/src/**/*.{ts,js}\" --ext .ts",
     "test": "npm -ws run test --if-present",
     "test:watch": "npm -ws run test --if-present -- --watch",
     "test:cov": "npm -ws run test --if-present -- --coverage",
