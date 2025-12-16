@@ -53,22 +53,70 @@ echo "Subindo com docker compose (deploy-only)"
 docker compose -f docker-compose.deploy.yml up -d
 
 echo "Aguardando serviços ficarem saudáveis (aguarde alguns segundos)"
-sleep 8
 
-health() {
-  URL=$1
-  if curl -sfS "$URL" >/dev/null; then
-    echo "OK: $URL"
-    return 0
-  else
-    echo "FALHA: $URL"
-    return 1
-  fi
+# wait_for_url: tenta acessar uma URL com retries e backoff
+# args: URL max_attempts initial_delay_seconds
+wait_for_url() {
+  local URL=$1
+  local MAX_ATTEMPTS=${2:-12}
+  local DELAY=${3:-2}
+  local ATTEMPT=1
+  local RET=1
+
+  while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+    if curl -sfS "$URL" >/dev/null; then
+      echo "OK: $URL"
+      RET=0
+      break
+    else
+      echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: $URL not ready (sleep ${DELAY}s)"
+      sleep $DELAY
+      # exponential-ish backoff (grow by factor 1.5, integer)
+      DELAY=$(( (DELAY * 3) / 2 ))
+      ATTEMPT=$((ATTEMPT + 1))
+    fi
+  done
+
+  return $RET
 }
 
-echo "Testando endpoints de health (localhost:3010/3011/3012)"
-health http://localhost:3010/auth/me || echo "  (401 esperado - auth requer token)"
-health http://localhost:3011/users/health || true
-health http://localhost:3012/health || true
+# wait_for_port: verifica se porta TCP está ouvindo (timeout por tentativa)
+wait_for_port() {
+  local HOST=${1:-localhost}
+  local PORT=${2}
+  local MAX_ATTEMPTS=${3:-12}
+  local DELAY=${4:-1}
+  local ATTEMPT=1
+
+  while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+    if nc -z "$HOST" "$PORT" >/dev/null 2>&1; then
+      echo "port $HOST:$PORT is open"
+      return 0
+    fi
+    echo "port check $ATTEMPT/$MAX_ATTEMPTS: $HOST:$PORT (sleep ${DELAY}s)"
+    sleep $DELAY
+    ATTEMPT=$((ATTEMPT + 1))
+  done
+  return 1
+}
+
+# Prefer testar via gateway (NGINX) para validar o ponto único de entrada
+GATEWAY_HOST=${GATEWAY_HOST:-localhost}
+GATEWAY_PORT=${GATEWAY_PORT:-80}
+GATEWAY_BASE_URL="http://${GATEWAY_HOST}:${GATEWAY_PORT}"
+
+echo "Aguardando gateway em ${GATEWAY_HOST}:${GATEWAY_PORT}..."
+if wait_for_port "$GATEWAY_HOST" "$GATEWAY_PORT" 20 1; then
+  echo "Gateway disponível em ${GATEWAY_BASE_URL}"
+else
+  echo "Gateway não respondeu na porta ${GATEWAY_PORT} após várias tentativas" >&2
+fi
+
+echo "Testando endpoints via gateway (${GATEWAY_BASE_URL})"
+# autenticação/paths esperados via gateway: /auth, /users, /events, /registrations
+wait_for_url "${GATEWAY_BASE_URL}/auth/health" 12 2 || echo "  (auth pode exigir token; verifique rota /auth/health)"
+wait_for_url "${GATEWAY_BASE_URL}/users/health" 12 2 || echo "  (users health falhou)"
+wait_for_url "${GATEWAY_BASE_URL}/events/health" 12 2 || echo "  (events health falhou)"
+wait_for_url "${GATEWAY_BASE_URL}/registrations/health" 12 2 || echo "  (registrations health falhou)"
 
 echo "Deploy (compose deploy) concluído. Verifique logs se necessário."
