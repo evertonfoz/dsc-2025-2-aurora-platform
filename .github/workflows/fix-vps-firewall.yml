@@ -1,0 +1,48 @@
+name: Fix VPS Firewall Port 80
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add iptables rule for port 80
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+            
+            echo "=== Current iptables INPUT rules ==="
+            sudo iptables -L INPUT -n --line-numbers
+            
+            echo ""
+            echo "=== Adding rule to accept port 80 (before REJECT) ==="
+            # Insert at position 5 (before the REJECT rule at position 8)
+            sudo iptables -I INPUT 5 -p tcp --dport 80 -j ACCEPT
+            
+            echo ""
+            echo "=== Adding rule to accept port 443 for future HTTPS ==="
+            sudo iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT
+            
+            echo ""
+            echo "=== Updated iptables INPUT rules ==="
+            sudo iptables -L INPUT -n --line-numbers
+            
+            echo ""
+            echo "=== Saving iptables rules to persist after reboot ==="
+            sudo sh -c 'iptables-save > /etc/iptables.rules' || echo "Could not save rules"
+            
+            echo ""
+            echo "=== Testing local access to port 80 ==="
+            curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://127.0.0.1/
+            
+            echo ""
+            echo "=== Done! Port 80 should now be accessible externally ==="
