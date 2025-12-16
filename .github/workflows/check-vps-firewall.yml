@@ -1,0 +1,40 @@
+name: Check VPS Firewall
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check firewall and network on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+            
+            echo "=== Checking iptables INPUT rules ==="
+            sudo iptables -L INPUT -n --line-numbers || echo "iptables not available"
+            
+            echo ""
+            echo "=== Checking if port 80 is listening ==="
+            sudo ss -tlnp | grep :80 || echo "Port 80 not listening"
+            
+            echo ""
+            echo "=== Docker containers exposing ports ==="
+            docker ps --format "table {{.Names}}\t{{.Ports}}"
+            
+            echo ""
+            echo "=== Testing local access to port 80 ==="
+            curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1/ || echo "Failed"
+            
+            echo ""
+            echo "=== Checking for UFW firewall ==="
+            sudo ufw status 2>/dev/null || echo "UFW not installed/active"
