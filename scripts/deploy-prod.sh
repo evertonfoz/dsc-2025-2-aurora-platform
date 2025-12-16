@@ -32,9 +32,14 @@ if [ ! -f .env.prod ]; then
     echo ".env.prod não encontrado — copiando de .env.prod.example"
     cp .env.prod.example .env.prod
     echo "ATENÇÃO: edite .env.prod e substitua segredos (JWT_ACCESS_SECRET, credenciais DB, etc.)"
-    read -p "Deseja abrir .env.prod agora em nano? (s/N) " OPEN
-    if [[ "$OPEN" =~ ^([sS]|[yY])$ ]]; then
-      nano .env.prod
+    # Não bloqueie em ambientes não-interativos (CI / workflow). Só abra em nano se houver um TTY
+    if [ -t 0 ] && [ -z "${GITHUB_ACTIONS:-}" ]; then
+      read -p "Deseja abrir .env.prod agora em nano? (s/N) " OPEN || true
+      if [[ "$OPEN" =~ ^([sS]|[yY])$ ]]; then
+        nano .env.prod
+      fi
+    else
+      echo "Modo não-interativo detectado — pulando abertura interativa de .env.prod"
     fi
   else
     echo "Arquivo .env.prod.example não existe. Saindo." >&2
