@@ -41,11 +41,12 @@
 - **Cada microsserviço expondo porta no host é correto?** Em desenvolvimento local, é aceitável mapear portas para testes manuais. Em produção (ou ambientes compartilhados), o ideal é não expor cada serviço diretamente; manter apenas o gateway/ingress exposto e comunicar os serviços internamente via rede do cluster/compose sem port bindings (`ports:`) ou com `expose:` apenas para saúde interna. Isso reduz superfície de ataque e força a passagem por autenticação/observabilidade centralizadas.
 
 ## Ação imediata aplicada (portas e compose)
-- `docker-compose.prod.yml` e `docker-compose.deploy.yml` foram ajustados para não expor portas dos serviços de aplicação; comunicação segue interna na rede `aurora_network`. `docker-compose.dev.yml` continua expondo portas para desenvolvimento e testes manuais.
+- `docker-compose.dev.yml` removeu `ports:` dos serviços de aplicação e mantém apenas o gateway Nginx publicado em `8080:80` (TLS opcional comentado). Todo acesso em dev passa pelo gateway.
+- `docker-compose.prod.yml` e `docker-compose.deploy.yml` seguem sem `ports:` nos serviços e agora incluem o gateway Nginx publicado em `80:80` (TLS opcional comentado). Comunicação entre serviços é interna na `aurora_network`.
 - Os guias de deploy serão atualizados para frisar que em prod/stage o tráfego externo deve passar por gateway/ingress, não por binds de porta individuais.
 
 ## Plano prático (para alunos aplicarem)
-1) **Ambientes:** mantenha portas expostas só em `docker-compose.dev.yml` para desenvolvimento; em prod/stage remova `ports:` e, se necessário, use `expose:` para health interno.  
+1) **Ambientes:** em dev, acessar serviços via gateway em `http://localhost:8080` (sem `ports:` individuais); em prod/stage remover `ports:` e, se necessário, usar `expose:` para health interno, mantendo apenas o gateway publicado.  
 2) **Cliente interno:** configure `USERS_API_URL=http://users-service:3011` (compose já referencia) e aplique timeout (3–5s) + retries com backoff no cliente HTTP; remova fallbacks inconsistentes.  
 3) **Docs de deploy:** registre nos guias que serviços não ficam expostos em prod e que todo acesso externo deve passar pelo gateway/ingress (ou reverse proxy).  
 4) **Gateway/ingress (planejamento):** adotar um gateway (Nginx/Traefik/API Gateway) para: roteamento por host/path, TLS, rate limiting, autenticação centralizada e observabilidade. Passos mínimos: definir domínios/paths, terminar TLS, propagar request-id, checar `/health`/`/ready` internos e embarcar a configuração no compose de produção (há Nginx em `production/docker-compose.prod.yml` como referência).
@@ -58,7 +59,8 @@
 - **Implementações (delta):**
   - `docker-compose.prod.yml`: removidos todos os blocos `ports:` de `users-service`, `auth-service`, `events-service`. Agora os serviços só escutam na rede interna `aurora_network`.
   - `docker-compose.deploy.yml`: removidos `ports:` de `users-service`, `auth-service`, `events-service`, `registrations-service`. Comunicação permanece interna.
-- **Efeito prático:** tráfego externo não alcança diretamente os microsserviços; exige gateway/reverse proxy para acesso público, reduzindo exposição e forçando passagem por autenticação/observabilidade centralizadas. Dev/QA continuam podendo expor portas em `docker-compose.dev.yml` para testes locais.
+  - `docker-compose.dev.yml`: removidos `ports:` dos quatro serviços de aplicação; o acesso passa pelo gateway em `8080:80` (TLS opcional comentado).
+- **Efeito prático:** tráfego externo não alcança diretamente os microsserviços; exige gateway/reverse proxy para acesso público, reduzindo exposição e forçando passagem por autenticação/observabilidade centralizadas. Em dev/QA o acesso também passa pelo gateway (`http://localhost:8080`); reexpor portas individuais deve ser algo temporário para debugging.
 - **Status:** concluído; arquivos `docker-compose.prod.yml` e `docker-compose.deploy.yml` conferidos sem blocos `ports:` para serviços de aplicação.
 
 ## Caso pedagógico 02 — Falha de autenticação no Postgres e migrações não aplicadas
@@ -238,3 +240,523 @@
   - ✅ Seeding de usuários (admin e test) funciona sem crash
   - ✅ ThrottlerGuard ativo em todos os serviços sem erros
   - ✅ Nenhum erro de "relation does not exist" ou "crypto is not defined"
+
+---
+
+## Caso pedagógico 06 — Organização de imagens Docker no GHCR e deploy em VPS
+
+**Data:** 2025-12-15
+**Contexto:** Correção da organização de imagens Docker no GitHub Container Registry e atualização do deploy na VPS
+
+---
+
+### Problema identificado
+
+As imagens Docker dos microsserviços estavam sendo publicadas **na raiz da conta do usuário** no GitHub Container Registry (GHCR):
+- ❌ `ghcr.io/evertonfoz/users-service:latest`
+- ❌ `ghcr.io/evertonfoz/auth-service:latest`
+- ❌ `ghcr.io/evertonfoz/events-service:latest`
+- ❌ `ghcr.io/evertonfoz/registrations-service:latest`
+
+Em vez de estarem **organizadas por repositório**:
+- ✅ `ghcr.io/evertonfoz/dsc-2025-2-aurora-platform/users-service:latest`
+- ✅ `ghcr.io/evertonfoz/dsc-2025-2-aurora-platform/auth-service:latest`
+- ✅ `ghcr.io/evertonfoz/dsc-2025-2-aurora-platform/events-service:latest`
+- ✅ `ghcr.io/evertonfoz/dsc-2025-2-aurora-platform/registrations-service:latest`
+
+#### Causa raiz
+Nos workflows de build dos serviços (`.github/workflows/build-*-service.yml`), estava sendo usado:
+```yaml
+images: ghcr.io/${{ github.repository_owner }}/service-name
+```
+
+A variável `github.repository_owner` retorna apenas o nome do usuário/organização (`evertonfoz`), sem incluir o nome do repositório.
+
+---
+
+### Impacto potencial
+
+#### 1. **Desorganização e escalabilidade**
+- Todas as imagens de todos os repositórios ficam misturadas na raiz da conta
+- Com múltiplos projetos, torna-se impossível identificar qual imagem pertence a qual repositório
+- Dificulta a gestão de permissões e visibilidade por projeto
+
+#### 2. **Conflitos de nomenclatura**
+- Se dois repositórios diferentes tiverem serviços com o mesmo nome (ex: `users-service`), haverá conflito
+- Não há isolamento entre projetos, podendo sobrescrever imagens acidentalmente
+
+#### 3. **Falhas no deploy**
+- O `docker-compose.prod.yml` estava configurado para buscar imagens no caminho com repositório
+- As imagens estavam sendo publicadas em caminho diferente
+- Deploy falhava por não encontrar as imagens no caminho esperado
+
+#### 4. **Dificuldade de auditoria**
+- Impossível rastrear facilmente quais imagens pertencem a qual projeto
+- Logs e métricas de uso de imagens ficam misturados
+
+---
+
+### Solução fundamentada
+
+#### Conceito: Namespacing de imagens Docker
+Docker e registries de containers seguem uma hierarquia de namespacing:
+```
+registry / namespace / image : tag
+```
+
+No GHCR (GitHub Container Registry):
+- **Registry:** `ghcr.io`
+- **Namespace:** deve incluir `owner/repository` para organização adequada
+- **Image:** nome do serviço
+- **Tag:** versão (latest, sha, etc)
+
+#### Referência GitHub Actions
+A variável correta a usar é `github.repository`, que retorna o caminho completo `owner/repo`:
+- `github.repository_owner` → `evertonfoz` (apenas o owner)
+- `github.repository` → `evertonfoz/dsc-2025-2-aurora-platform` (owner + repo)
+
+**Documentação oficial:** https://docs.github.com/en/actions/learn-github-actions/contexts#github-context
+
+#### Abordagem aplicada
+1. Corrigir workflows para usar `github.repository` em vez de `github.repository_owner`
+2. Atualizar `docker-compose.prod.yml` para usar variáveis de ambiente `GITHUB_ORG` e `GITHUB_REPO`
+3. Configurar `.env.prod` com valores corretos das variáveis
+4. Fazer deploy na VPS com as novas imagens
+5. Expor porta do `auth-service` para acesso público
+
+---
+
+### Implementações (delta)
+
+#### 1. `.github/workflows/build-users-service.yml` (e demais serviços)
+**Antes:**
+```yaml
+- uses: docker/metadata-action@v5
+  id: meta
+  with:
+    images: ghcr.io/${{ github.repository_owner }}/users-service
+```
+
+**Depois:**
+```yaml
+- uses: docker/metadata-action@v5
+  id: meta
+  with:
+    images: ghcr.io/${{ github.repository }}/users-service
+```
+
+**Efeito:** Imagens passam a ser publicadas em `ghcr.io/evertonfoz/dsc-2025-2-aurora-platform/users-service`, organizadas por repositório.
+
+---
+
+#### 2. `docker-compose.prod.yml` (todos os serviços)
+**Antes:**
+```yaml
+auth-service:
+  image: ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/auth-service:${AUTH_IMAGE_TAG:-latest}
+  restart: unless-stopped
+  env_file:
+    - .env.prod
+  environment:
+    NODE_ENV: production
+    # ...
+```
+
+**Depois (com exposição de porta):**
+```yaml
+auth-service:
+  image: ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/auth-service:${AUTH_IMAGE_TAG:-latest}
+  restart: unless-stopped
+  env_file:
+    - .env.prod
+  ports:
+    - '3010:3010'  # ← ADICIONADO para acesso público
+  environment:
+    NODE_ENV: production
+    # ...
+```
+
+**Efeito:**
+- Imagens agora usam variáveis de ambiente para compor o caminho completo
+- Porta 3010 do auth-service exposta para acesso externo
+- Permite flexibilidade para diferentes ambientes/organizações
+
+---
+
+#### 3. `.env.prod`
+**Antes:** (variáveis não existiam ou estavam vazias)
+
+**Depois:**
+```env
+# ---- GitHub Container Registry (GHCR) ----
+GITHUB_ORG=evertonfoz
+GITHUB_REPO=dsc-2025-2-aurora-platform
+REPO_OWNER=evertonfoz
+USERS_IMAGE_TAG=latest
+AUTH_IMAGE_TAG=latest
+EVENTS_IMAGE_TAG=latest
+REGISTRATIONS_IMAGE_TAG=latest
+```
+
+**Efeito:** Docker Compose consegue resolver corretamente o caminho completo das imagens no GHCR.
+
+---
+
+#### 4. `scripts/deploy-prod.sh`
+**Antes:** (sem nota sobre deploy local)
+
+**Depois:**
+```bash
+echo "[deploy-prod] usando imagens:"
+echo "  users:           ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/users-service:${USERS_TAG}"
+echo "  auth:            ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/auth-service:${AUTH_TAG}"
+echo "  events:          ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/events-service:${EVENTS_TAG}"
+echo "  registrations:   ghcr.io/${GITHUB_ORG}/${GITHUB_REPO}/registrations-service:${REGISTRATIONS_TAG}"
+echo ""
+echo "NOTA: Este script faz deploy LOCAL (docker compose)."
+echo "Para deploy na VPS, use o workflow: .github/workflows/deploy-to-vps.yml"
+```
+
+**Efeito:** Deixa claro para desenvolvedores que o script é para deploy local, não para VPS.
+
+---
+
+#### 5. `DEPLOYMENT_GUIDE.md`
+**Antes:**
+```yaml
+images: ghcr.io/${{ github.repository_owner }}/auth-service
+```
+
+**Depois:**
+```yaml
+images: ghcr.io/${{ github.repository }}/auth-service
+```
+
+**Efeito:** Documentação atualizada reflete as melhores práticas.
+
+---
+
+### Efeito prático pós-correção
+
+#### 1. **Organização e governança**
+✅ Imagens agora organizadas hierarquicamente por repositório
+✅ Fácil identificar e gerenciar imagens de cada projeto
+✅ Evita conflitos de nomenclatura entre diferentes repositórios
+✅ Facilita configuração de permissões por projeto no GHCR
+
+#### 2. **Deploy funcional**
+✅ Pull das imagens funciona corretamente na VPS
+✅ Containers sobem com as novas imagens do GHCR
+✅ Processo de CI/CD totalmente funcional
+✅ Auth-service acessível publicamente em `http://64.181.173.121:3010`
+
+#### 3. **Auditoria e rastreabilidade**
+✅ Possível rastrear quais imagens pertencem a cada repositório
+✅ Logs e métricas de uso organizados por projeto
+✅ Facilita troubleshooting e gestão de versões
+
+#### 4. **Alinhamento com boas práticas**
+✅ Segue convenções do Docker e GitHub Container Registry
+✅ Escalável para múltiplos projetos e repositórios
+✅ Documentação alinhada com a implementação
+
+---
+
+### Processo completo executado
+
+#### Fase 1: Diagnóstico
+1. Identificação do problema ao tentar executar `deploy-prod.sh`
+2. Erro de autenticação ao fazer pull das imagens
+3. Descoberta que as imagens estavam no caminho errado no GHCR
+
+#### Fase 2: Correção dos workflows
+1. Análise dos workflows de build (4 serviços)
+2. Correção de `github.repository_owner` → `github.repository`
+3. Criação de branch `fix/ghcr-image-paths`
+4. Commit com mensagem descritiva
+5. Push e criação de PR #90
+
+#### Fase 3: CI/CD
+1. Workflows CI executados (lint, build, testes)
+2. Build das 4 imagens Docker com novos caminhos
+3. Publicação no GHCR nos caminhos corretos
+4. Merge do PR com squash
+
+#### Fase 4: Deploy na VPS
+1. Checkout da branch main atualizada
+2. Down dos containers antigos na VPS
+3. Cópia de `.env.prod` e `docker-compose.prod.yml` atualizados para VPS
+4. Pull das novas imagens na VPS
+5. Up dos containers com novas imagens
+6. Verificação de status e health checks
+
+#### Fase 5: Testes
+1. Teste de acesso público ao auth-service
+2. Verificação de logs dos serviços
+3. Confirmação de funcionamento correto
+
+---
+
+## Caso pedagógico 07 — Gateway reverso (Nginx) e exposição controlada
+
+- **Problema identificado:** auth-service segue exposto diretamente na porta 3010; não existe gateway central. Não há domínio ou certificado provisionado, e os alunos ainda não praticaram a configuração de um ponto de entrada único.
+- **Fundamentação:** publicar apenas um gateway reduz superfície de ataque, centraliza autenticação, CORS e rate limiting, facilita observabilidade (logs/request-id) e gerenciamento de TLS. Expor cada serviço individualmente duplica configuração de segurança e permite bypass de controles.
+- **Decisão:** adotar o Nginx já esboçado em `production/docker-compose.prod.yml` como gateway padrão, usando o template `production/nginx/default.conf` com roteamento por path (`/auth`, `/users`, `/events`, `/registrations`). Apenas o gateway publica portas; serviços permanecem somente na rede interna.
+- **TLS/domínio:** sem domínio real não é possível emitir certificado válido via Certbot/Let's Encrypt. Opções:
+  - **Prod (recomendado):** quando houver DNS apontado para o host, usar Certbot (desafio HTTP-01) com o gateway escutando 80/443, montar `/etc/letsencrypt` e ativar redirect HTTP→HTTPS no Nginx.
+  - **Lab/ensaio:** gerar certificado autoassinado (ex.: `openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout selfsigned.key -out selfsigned.crt -subj "/CN=localhost"`), montar no container e apontar `ssl_certificate`/`ssl_certificate_key` para esses arquivos. Navegadores exibirão aviso; não usar em produção. Útil para treinar pipeline TLS e verificar configuração de proxy seguro mesmo sem domínio real.
+  - **Sem TLS:** operar em HTTP até provisionar domínio/certificado, com ciência de que tráfego não estará cifrado.
+- **Impacto em portas:** após o gateway estar funcional, remover blocos `ports:` dos serviços de aplicação nos composes principais, mantendo apenas o gateway exposto. Todo tráfego externo deve passar pelo Nginx.
+- **Plano de implementação (Fase 6):** (1) incluir gateway nos composes principais reutilizando o template; (2) versionar config de Nginx com headers de segurança básicos e rate limiting; (3) documentar passos de TLS com Certbot para quando o domínio estiver disponível; (4) só então cortar exposições diretas; (5) validar rotas/health via gateway e registrar comandos de verificação.
+- **Implementação em dev para prática e testes:** `docker-compose.dev.yml` passou a ter o serviço `gateway` (Nginx 1.25) publicado em `8080:80` e opcional `8443:443` (quando habilitado o bloco HTTPS). A config está em `nginx/dev.conf`, roteando `/auth`, `/users`, `/events`, `/registrations` para os serviços internos e com rate limit leve. Para ensaiar HTTPS em lab, gerar cert autoassinado em `nginx/certs` e descomentar bloco e porta 8443; testar com `curl -k https://localhost:8443/<rota>`.
+- **Notas dos testes em dev (12/15 - manhã):** após subir o stack, foi preciso remover o volume (`docker compose -f docker-compose.dev.yml down -v`) para alinhar credenciais do Postgres; os serviços voltaram a subir com `postgres/postgres`. Ajustei o `auth-service` para apontar o comando para `dist/app/src/main.js` (em vez de `dist/src/main.js`) via `package.json` e `docker-compose.dev.yml`. O gateway responde internamente, mas a rota `/auth/health` retornou 502 enquanto o auth-service reiniciava por não encontrar `package.json` no runtime do container; próximo passo é ajustar o Dockerfile do auth-service (copiar `package.json` no stage final ou usar `node dist/app/src/main.js` direto) e revalidar as rotas via gateway.
+- **Correção e validação completa (12/15 - noite até 12/16):**
+  - `auth-service` no compose dev passou a usar `node dist/app/src/main.js` (o Dockerfile não copia `package.json` no stage final).
+  - Gateway dev/prod usa config dedicada (`nginx/dev.conf`, `nginx/prod.conf`), com rate limit e regex para `/registrations/*` preservando o prefixo ao encaminhar para o serviço.
+  - health do registrations-service isolado em `HealthController` (`/health`), eliminando redundância no controller principal.
+  - TLS de laboratório habilitável em dev com certificado autoassinado em `nginx/certs` e porta `8443` publicada.
+  - Validação via gateway em dev (HTTP/HTTPS):  
+    - `http://localhost:8080/auth/health` → `{"status":"ok"}` ✅  
+    - `http://localhost:8080/users/health` → `{"status":"ok"}` ✅  
+    - `http://localhost:8080/events/health` → `{"status":"ok"}` ✅  
+    - `http://localhost:8080/registrations/health` → `{"status":"ok"}` ✅  
+  Gateway operacional com roteamento correto para os 4 serviços; próximo passo é manter apenas o gateway exposto em todos os ambientes (Fase 6).
+
+---
+
+## Próximas fases a implementar
+
+### Fase 6: Exposição controlada de serviços (Curto prazo - 1-2 dias)
+**Problema:** Apenas auth-service está exposto publicamente na porta 3010. Outros serviços podem precisar de acesso externo controlado.
+
+**Tarefas:**
+- [ ] Avaliar quais serviços precisam estar acessíveis externamente
+- [ ] Implementar API Gateway (Nginx/Traefik) como ponto único de entrada
+- [ ] Configurar rotas do gateway para cada serviço
+- [ ] Remover exposição direta das portas dos serviços
+- [ ] Todo tráfego externo passa pelo gateway com autenticação/rate-limiting
+
+**Benefícios:**
+- Segurança: ponto único de entrada com autenticação centralizada
+- Observabilidade: logs centralizados de todas as requisições
+- Controle: rate limiting, CORS, e políticas de segurança em um só lugar
+
+---
+
+### Fase 7: Monitoramento e observabilidade (Médio prazo - 1 semana)
+**Problema:** Não há visibilidade sobre o comportamento dos serviços em produção.
+
+**Tarefas:**
+- [ ] Implementar health checks completos em todos os serviços
+- [ ] Configurar Prometheus para coleta de métricas
+- [ ] Implementar Grafana para dashboards
+- [ ] Adicionar alertas para eventos críticos (serviço down, latência alta, etc)
+- [ ] Implementar logging estruturado com correlação de request-id
+- [ ] Adicionar tracing distribuído (OpenTelemetry/Jaeger)
+
+**Benefícios:**
+- Detecção proativa de problemas
+- Troubleshooting mais rápido
+- Insights sobre performance e uso
+- SLA e métricas de disponibilidade
+
+---
+
+### Fase 8: Segurança e hardening (Médio prazo - 1-2 semanas)
+**Problema:** Serviços em produção precisam de camadas adicionais de segurança.
+
+**Tarefas:**
+- [ ] Implementar HTTPS com certificados SSL/TLS (Let's Encrypt)
+- [ ] Configurar firewall (UFW/iptables) restringindo apenas portas necessárias
+- [ ] Implementar autenticação mútua (mTLS) entre serviços
+- [ ] Rotação automática de secrets (JWT secrets, DB passwords)
+- [ ] Implementar rate limiting por IP/usuário
+- [ ] Adicionar WAF (Web Application Firewall)
+- [ ] Configurar backup automático do banco de dados
+- [ ] Implementar scanning de vulnerabilidades nas imagens Docker
+
+**Benefícios:**
+- Proteção contra ataques comuns (DDoS, SQL injection, XSS)
+- Criptografia de dados em trânsito
+- Recuperação de desastres
+- Conformidade com boas práticas de segurança
+
+---
+
+### Fase 9: CI/CD avançado (Médio prazo - 2 semanas)
+**Problema:** Deploy manual na VPS é propenso a erros e não escala.
+
+**Tarefas:**
+- [ ] Automatizar deploy na VPS via workflow GitHub Actions
+- [ ] Implementar deploy blue-green ou canary
+- [ ] Adicionar testes de integração no pipeline
+- [ ] Implementar rollback automático em caso de falha
+- [ ] Configurar ambientes de staging separado de produção
+- [ ] Implementar aprovações manuais para deploy em produção
+- [ ] Adicionar smoke tests pós-deploy
+
+**Benefícios:**
+- Deploys mais rápidos e confiáveis
+- Redução de downtime
+- Maior confiança nas mudanças
+- Facilita rollback em caso de problemas
+
+---
+
+### Fase 10: Alta disponibilidade e escalabilidade (Longo prazo - 1 mês)
+**Problema:** VPS única é ponto único de falha e não escala.
+
+**Tarefas:**
+- [ ] Migrar para orquestrador de containers (Kubernetes/Docker Swarm)
+- [ ] Implementar múltiplas réplicas de cada serviço
+- [ ] Configurar load balancer
+- [ ] Separar banco de dados em instância gerenciada
+- [ ] Implementar cache distribuído (Redis)
+- [ ] Configurar auto-scaling baseado em métricas
+- [ ] Implementar disaster recovery e backup geográfico
+
+**Benefícios:**
+- Zero downtime em deploys
+- Resiliência a falhas
+- Capacidade de escalar horizontalmente
+- Melhor performance sob carga
+
+---
+
+### Fase 11: Segregação de dados (Longo prazo - 1 mês)
+**Problema:** Todos os serviços compartilham o mesmo banco de dados PostgreSQL.
+
+**Tarefas:**
+- [ ] Avaliar separação de bancos de dados por serviço
+- [ ] Implementar bancos isolados ou instâncias separadas
+- [ ] Migrar schemas para bancos dedicados
+- [ ] Implementar estratégia de backup por serviço
+- [ ] Configurar permissões de acesso granulares
+- [ ] Implementar saga pattern para transações distribuídas
+
+**Benefícios:**
+- Isolamento total entre serviços
+- Falha em um serviço não afeta outros
+- Escalabilidade independente por serviço
+- Melhor segurança e governança de dados
+
+---
+
+## Lições aprendidas (para alunos)
+
+### 1. **Importância de variáveis de contexto do GitHub Actions**
+Usar a variável correta (`github.repository` vs `github.repository_owner`) faz toda diferença na organização de artefatos.
+
+### 2. **Namespacing e organização hierárquica**
+Registries de containers seguem hierarquias. Não respeitá-las causa desorganização e conflitos.
+
+### 3. **Configuração por ambiente**
+Uso de variáveis de ambiente (`.env.prod`) permite flexibilidade e portabilidade entre ambientes.
+
+### 4. **Documentação alinhada com implementação**
+Manter documentação (DEPLOYMENT_GUIDE.md) sincronizada com o código evita confusão.
+
+### 5. **Processo incremental**
+Resolver problemas em fases (correção → PR → merge → deploy → teste) é mais seguro que fazer tudo de uma vez.
+
+### 6. **Exposição controlada de serviços**
+Em produção, expor apenas o necessário e preferencialmente através de um gateway centralizado.
+
+### 7. **Testes em múltiplas camadas**
+- Local (dentro do container via localhost)
+- Público (acesso externo via IP)
+- Ambos são importantes para validar o funcionamento completo
+
+---
+
+## Referências
+
+1. **GitHub Actions Context:** https://docs.github.com/en/actions/learn-github-actions/contexts#github-context
+2. **GHCR Documentation:** https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry
+3. **Docker Image Naming:** https://docs.docker.com/engine/reference/commandline/tag/#extended-description
+4. **Docker Compose Environment Variables:** https://docs.docker.com/compose/environment-variables/
+5. **Container Registry Best Practices:** https://cloud.google.com/architecture/best-practices-for-building-containers
+
+---
+
+## Comandos úteis para reproduzir
+
+### Verificar imagens locais
+```bash
+docker images | grep ghcr.io
+```
+
+### Pull manual de uma imagem
+```bash
+docker pull ghcr.io/evertonfoz/dsc-2025-2-aurora-platform/auth-service:latest
+```
+
+### Verificar containers na VPS
+```bash
+ssh ubuntu@64.181.173.121 'docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
+```
+
+### Testar health check
+```bash
+curl -I http://64.181.173.121:3010/health
+```
+
+### Ver logs de um serviço na VPS
+```bash
+ssh ubuntu@64.181.173.121 'cd ~/dsc-2025-2-aurora-platform && docker compose --env-file .env.prod -f docker-compose.prod.yml logs --tail=50 auth-service'
+```
+
+### Resumo executivo
+
+- **Problema identificado:** Imagens Docker dos microsserviços sendo publicadas na raiz da conta do usuário no GitHub Container Registry (`ghcr.io/evertonfoz/service-name`) em vez de organizadas por repositório (`ghcr.io/evertonfoz/dsc-2025-2-aurora-platform/service-name`).
+
+- **Impacto potencial:**
+  - Desorganização e dificuldade de gerenciar múltiplos repositórios
+  - Conflitos de nomenclatura entre projetos diferentes
+  - Falhas no deploy por caminhos incorretos
+  - Impossibilidade de rastrear imagens por projeto
+
+- **Solução aplicada:**
+  - Correção dos workflows GitHub Actions (`.github/workflows/build-*-service.yml`) para usar `github.repository` em vez de `github.repository_owner`
+  - Atualização do `docker-compose.prod.yml` para usar variáveis `${GITHUB_ORG}/${GITHUB_REPO}`
+  - Configuração do `.env.prod` com `GITHUB_REPO=dsc-2025-2-aurora-platform`
+  - Deploy completo na VPS (64.181.173.121) com novas imagens
+  - Exposição da porta 3010 do auth-service para acesso público
+
+- **Efeito prático:**
+  - ✅ Imagens organizadas hierarquicamente por repositório
+  - ✅ Deploy funcional na VPS com pull correto das imagens
+  - ✅ Auth-service acessível publicamente em `http://64.181.173.121:3010/health`
+  - ✅ Processo de CI/CD totalmente funcional
+  - ✅ Alinhamento com boas práticas de namespacing de containers
+
+### Próximas fases identificadas
+
+O caso pedagógico completo documenta **11 fases** de evolução identificadas:
+
+1. **Fase 6:** Exposição controlada de serviços via API Gateway (curto prazo)
+2. **Fase 7:** Monitoramento e observabilidade com Prometheus/Grafana (médio prazo)
+3. **Fase 8:** Segurança e hardening com HTTPS/WAF/mTLS (médio prazo)
+4. **Fase 9:** CI/CD avançado com deploy automatizado e blue-green (médio prazo)
+5. **Fase 10:** Alta disponibilidade e escalabilidade com Kubernetes (longo prazo)
+6. **Fase 11:** Segregação de dados com bancos isolados por serviço (longo prazo)
+
+### Processo pedagógico
+
+O caso documenta todo o processo executado:
+- Diagnóstico do problema
+- Correção incremental dos workflows
+- CI/CD com validação de testes
+- Pull Request e merge (#90)
+- Deploy na VPS
+- Testes de acesso público e interno
+
+### Materiais de aprendizado incluídos
+
+- ✅ Conceitos de namespacing de imagens Docker
+- ✅ Variáveis de contexto do GitHub Actions
+- ✅ Comandos úteis para reproduzir o processo
+- ✅ Referências para documentação oficial
+- ✅ Lições aprendidas para alunos
+
+**Status:** Concluído em 15/12/2025. Documentação completa disponível em `docs/casos-pedagogicos/2025-12-15-organizacao-imagens-ghcr-deploy-vps.md`

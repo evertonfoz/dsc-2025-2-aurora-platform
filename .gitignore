@@ -138,3 +138,7 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Local TLS assets for dev gateway
+nginx/certs/*.key
+nginx/certs/*.crt
