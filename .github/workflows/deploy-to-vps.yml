@@ -41,8 +41,11 @@ jobs:
             cd /home/ubuntu/${{ secrets.VPS_PROJECT_DIR }}
             
             # Garante que o repositório local está atualizado com a branch main
-            git checkout main
-            git pull origin main
+            # Faz fetch e força o estado para origin/main (evita falhas quando houver alterações locais)
+            git checkout main || git checkout -B main
+            git fetch origin --prune
+            git reset --hard origin/main
+            git clean -fd || true
             
             # Carrega as variáveis de ambiente do arquivo .env.prod
             set -o allexport
