@@ -1,0 +1,45 @@
+name: Check VPS Gateway
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run gateway checks on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+
+            # Navega para o diretório do projeto na VPS
+            cd /home/${{ secrets.VPS_USERNAME }}/${{ secrets.VPS_PROJECT_DIR }} || true
+
+            echo "=== docker compose ps ==="
+            docker compose --env-file .env.prod -f docker-compose.prod.yml ps || true
+
+            echo "=== gateway logs (tail 200) ==="
+            docker compose --env-file .env.prod -f docker-compose.prod.yml logs gateway --tail 200 || true
+
+            echo "=== curl local gateway / ==="
+            curl -i http://127.0.0.1/ || true
+
+            echo "=== curl local /auth/health ==="
+            curl -i http://127.0.0.1/auth/health || true
+
+            echo "=== curl local /events/health ==="
+            curl -i http://127.0.0.1/events/health || true
+
+            echo "=== curl local /users/ ==="
+            curl -i http://127.0.0.1/users/ || true
+
+            echo "=== curl local /registrations/health ==="
+            curl -i http://127.0.0.1/registrations/health || true
