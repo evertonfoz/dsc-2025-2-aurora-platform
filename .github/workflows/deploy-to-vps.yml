@@ -52,8 +52,9 @@ jobs:
             source .env.prod
             set +o allexport
             
-            # Faz o login no GitHub Container Registry usando GH_PAT do .env.prod
-            echo "$GH_PAT" | docker login ghcr.io -u evertonfoz --password-stdin
+            # Faz o login no GitHub Container Registry usando o token seguro do GitHub Secrets
+            # Caso queira usar o GH_PAT presente em .env.prod, remova esta linha.
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u evertonfoz --password-stdin
             
             # Baixa as imagens mais recentes definidas no docker-compose.deploy.yml
             docker compose --env-file .env.prod -f docker-compose.deploy.yml pull
