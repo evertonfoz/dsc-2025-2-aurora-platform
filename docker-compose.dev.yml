@@ -32,8 +32,6 @@ services:
       dockerfile: ./packages/events-service/Dockerfile
     container_name: aurora_events_service
     restart: unless-stopped
-    ports:
-      - '3012:3012'
     # Load sensitive configuration (DB credentials, SERVICE_TOKEN, JWT secrets, etc.)
     # from the repository `.env` file instead of baking them in the compose file.
     env_file:
@@ -60,8 +58,6 @@ services:
       dockerfile: ./packages/auth-service/Dockerfile
     container_name: aurora_auth_service
     restart: unless-stopped
-    ports:
-      - '3010:3010'
     # Load sensitive vars from .env and keep only non-sensitive overrides here
     env_file:
       - .env
@@ -79,7 +75,7 @@ services:
     # volumes:
     #   - ./packages/auth-service:/app
     #   - /app/node_modules
-    command: node dist/src/main.js
+    command: node dist/app/src/main.js
     networks:
       - aurora_network
   
@@ -89,8 +85,6 @@ services:
       dockerfile: ./packages/users-service/Dockerfile
     container_name: aurora_users_service
     restart: unless-stopped
-    ports:
-      - '3011:3011'
     # Load sensitive vars from .env and keep only non-sensitive overrides here
     env_file:
       - .env
@@ -113,8 +107,6 @@ services:
       dockerfile: ./packages/registrations-service/Dockerfile
     container_name: aurora_registrations_service
     restart: unless-stopped
-    ports:
-      - '3013:3013'
     env_file:
       - .env
     environment:
@@ -125,6 +117,28 @@ services:
       db:
         condition: service_healthy
     command: node dist/main.js
+    networks:
+      - aurora_network
+
+  gateway:
+    image: nginx:1.25
+    container_name: aurora_gateway_dev
+    restart: unless-stopped
+    depends_on:
+      auth-service:
+        condition: service_started
+      users-service:
+        condition: service_started
+      events-service:
+        condition: service_started
+      registrations-service:
+        condition: service_started
+    ports:
+      - '8080:80'
+      - '8443:443'
+    volumes:
+      - ./nginx/dev.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
     networks:
       - aurora_network
 

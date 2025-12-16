@@ -7,11 +7,6 @@ import { OwnerId } from '@aurora/common';
 export class RegistrationsController {
   constructor(private readonly service: RegistrationsService) {}
 
-  @Get('health')
-  health() {
-    return { status: 'ok' };
-  }
-
   @Post()
   async create(@OwnerId() ownerId: number, @Body() dto: CreateRegistrationDto) {
     return this.service.create({ userId: ownerId, eventId: dto.eventId, origin: dto.origin });

@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import Joi from 'joi';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { RegistrationsController } from './registrations.controller';
+import { HealthController } from './health.controller';
 import { RegistrationsService } from './registrations.service';
 
 @Module({
@@ -60,7 +61,7 @@ import { RegistrationsService } from './registrations.service';
       },
     }),
   ],
-  controllers: [RegistrationsController],
+  controllers: [RegistrationsController, HealthController],
   providers: [
     RegistrationsService,
     {

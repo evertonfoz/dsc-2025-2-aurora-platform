@@ -5,10 +5,11 @@
   "description": "Scaffold do auth-service extraído do monolito para fins didáticos",
   "main": "dist/main.js",
   "scripts": {
-  "build": "tsc -p tsconfig.json",
-  "start": "node dist/src/main.js",
-  "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
-  "demo": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/app/src/main.js",
+    "start:prod": "node dist/app/src/main.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "demo": "ts-node-dev --respawn --transpile-only src/main.ts",
     "test": "jest",
     "test:integration": "jest --config jest.integration.config.ts",
     "contract:test": "jest --testPathPattern=contract"
