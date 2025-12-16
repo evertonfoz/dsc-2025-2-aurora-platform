@@ -497,109 +497,337 @@ images: ghcr.io/${{ github.repository }}/auth-service
 
 ---
 
-## Caso pedagógico 07 — Gateway reverso (Nginx) e exposição controlada
+## Caso pedagógico 07 — Gateway reverso (Nginx) e exposição controlada em VPS
+
+**Data:** 2025-12-16  
+**Contexto:** Configuração completa do gateway Nginx em VPS Oracle Cloud com resolução de problemas de firewall
+
+---
 
 ### Problema identificado
-Atualmente, o `auth-service` segue exposto diretamente na porta 3010 em produção, sem um gateway centralizado. Isso amplia a superfície de ataque, dificulta a centralização de autenticação, CORS, rate limiting e observabilidade, além de permitir o bypass de controles de segurança. Não há domínio ou certificado provisionado, e a configuração de um ponto de entrada único ainda não foi praticada.
 
-### Fundamentação
-Publicar apenas um gateway (Nginx) reduz a superfície de ataque, centraliza autenticação, CORS e rate limiting, facilita observabilidade (logs/request-id) e gerenciamento de TLS. Expor cada serviço individualmente duplica configuração de segurança e permite bypass de controles. O padrão recomendado é que apenas o gateway publique portas externas, mantendo os serviços acessíveis apenas na rede interna do Docker Compose.
+Após o deploy dos microsserviços na VPS, o gateway Nginx estava funcionando **internamente** mas não respondia a requisições **externas**. Os testes via SSH dentro da VPS funcionavam perfeitamente, mas chamadas externas via `curl http://<IP_VPS>/` resultavam em **timeout**.
 
-### Decisão e abordagem
-Adotar o Nginx já esboçado em `production/docker-compose.prod.yml` como gateway padrão, usando o template `production/nginx/default.conf` com roteamento por path (`/auth`, `/users`, `/events`, `/registrations`). Apenas o gateway publica portas; serviços permanecem somente na rede interna. O compose de desenvolvimento (`docker-compose.dev.yml`) já reflete essa arquitetura, expondo apenas o gateway em `8080:80`.
+#### Sintomas observados
+- `curl http://127.0.0.1/` (dentro da VPS) → **200 OK** ✅
+- `curl http://64.181.173.121/` (externo) → **Timeout** ❌
+- Todos os containers rodando normalmente
+- Porta 80 escutando no host
 
-#### TLS/domínio
-- **Produção:** Quando houver DNS apontado para o host, usar Certbot (desafio HTTP-01) com o gateway escutando 80/443, montar `/etc/letsencrypt` e ativar redirect HTTP→HTTPS no Nginx.
-- **Lab/ensaio:** Gerar certificado autoassinado (exemplo: `openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout selfsigned.key -out selfsigned.crt -subj "/CN=localhost"`), montar no container e apontar `ssl_certificate`/`ssl_certificate_key` para esses arquivos. Útil para treinar pipeline TLS mesmo sem domínio real.
-- **Sem TLS:** Operar em HTTP até provisionar domínio/certificado, ciente de que o tráfego não estará cifrado.
+---
 
-### Implementação prática
-1. Incluir o serviço `gateway` (Nginx) nos composes principais, reutilizando o template de configuração.
-2. Versionar a config do Nginx com headers de segurança básicos e rate limiting.
-3. Documentar passos de TLS com Certbot para quando o domínio estiver disponível.
-4. Remover blocos `ports:` dos serviços de aplicação, mantendo apenas o gateway exposto.
-5. Validar rotas e health checks via gateway e registrar comandos de verificação.
+### Causa raiz: Bloqueio em duas camadas
 
-#### Exemplo de configuração de rota no Nginx (`nginx/prod.conf`):
+O acesso externo estava sendo bloqueado em **duas camadas** distintas:
+
+#### 1. **Iptables na VPS (Linux)**
+O firewall da VM tinha regras que permitiam apenas portas específicas (22, 3010, 3011, 3012) antes de uma regra **REJECT all** que bloqueava todo o resto:
+
+```
+Chain INPUT (policy ACCEPT)
+1    ACCEPT     state RELATED,ESTABLISHED
+2    ACCEPT     icmp
+3    ACCEPT     all (loopback)
+4    ACCEPT     tcp  dpt:22 (SSH)
+5    ACCEPT     tcp  dpt:3012
+6    ACCEPT     tcp  dpt:3011
+7    ACCEPT     tcp  dpt:3010
+8    REJECT     all  ← BLOQUEIA porta 80!
+9    ACCEPT     tcp
+```
+
+#### 2. **Oracle Cloud Security List**
+A Security List da VCN não tinha regra de ingresso liberando portas 80/443 (HTTP/HTTPS).
+
+---
+
+### Solução implementada
+
+#### Passo 1: Adicionar regra iptables para portas 80 e 443
+
+Executar na VPS via SSH:
+```bash
+# Adicionar regra para porta 80 ANTES da regra REJECT
+sudo iptables -I INPUT 5 -p tcp --dport 80 -j ACCEPT
+
+# Adicionar regra para porta 443 (HTTPS futuro)
+sudo iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT
+
+# Verificar as regras atualizadas
+sudo iptables -L INPUT -n --line-numbers
+
+# Salvar regras para persistir após reboot
+sudo sh -c 'iptables-save > /etc/iptables.rules'
+```
+
+#### Passo 2: Liberar portas na Oracle Cloud Security List
+
+1. Acessar o **Oracle Cloud Console**
+2. Navegar para **Networking → Virtual Cloud Networks**
+3. Clicar na VCN do projeto (ex: `vcn-aurora`)
+4. Clicar em **Security Lists → Default Security List**
+5. Na aba **Ingress Rules**, clicar em **Add Ingress Rules**
+6. Configurar:
+
+| Campo | Valor |
+|-------|-------|
+| Stateless | ❌ (desmarcado) |
+| Source Type | CIDR |
+| Source CIDR | `0.0.0.0/0` |
+| IP Protocol | TCP |
+| Destination Port Range | `80-443` |
+| Description | HTTP/HTTPS Access |
+
+7. Clicar em **Add Ingress Rules**
+
+> ⚠️ **Nota:** As regras podem levar 2-5 minutos para propagar.
+
+---
+
+### Verificação do funcionamento
+
+Após aplicar as correções, verificar o acesso:
+
+```bash
+# Teste interno (via SSH na VPS)
+curl -s http://127.0.0.1/
+# Esperado: "Aurora gateway ativo"
+
+# Teste externo (de qualquer máquina)
+curl -s http://<IP_VPS>/
+# Esperado: "Aurora gateway ativo"
+
+# Health checks via gateway
+curl http://<IP_VPS>/auth/health
+curl http://<IP_VPS>/users/health
+curl http://<IP_VPS>/events/health
+curl http://<IP_VPS>/registrations/health
+# Esperado: {"status":"ok"}
+```
+
+---
+
+### Workaround: SSH Tunnel (para redes com firewall corporativo)
+
+Se sua rede local (universidade, empresa) bloquear portas não-padrão, use SSH Tunnel:
+
+```bash
+# Criar túnel (mapeia porta local 8080 para porta 80 da VPS)
+ssh -f -N -L 8080:localhost:80 ubuntu@<IP_VPS>
+
+# Acessar via localhost
+curl http://localhost:8080/
+
+# Encerrar túnel quando terminar
+pkill -f "ssh -f -N -L"
+```
+
+O túnel funciona porque a porta 22 (SSH) geralmente está liberada.
+
+---
+
+### Workflows de automação criados
+
+Para automatizar a verificação e correção, foram criados workflows GitHub Actions:
+
+#### 1. `check-vps-gateway.yml` — Verificação de endpoints
+Testa todos os endpoints via SSH na VPS:
+```bash
+gh workflow run check-vps-gateway.yml
+gh run view <run_id> --log
+```
+
+#### 2. `check-vps-firewall.yml` — Diagnóstico de firewall
+Mostra regras iptables e status de portas:
+```bash
+gh workflow run check-vps-firewall.yml
+```
+
+#### 3. `fix-vps-firewall.yml` — Correção automática
+Adiciona regras iptables para portas 80/443:
+```bash
+gh workflow run fix-vps-firewall.yml
+```
+
+---
+
+### Configuração do Nginx (gateway)
+
+O arquivo `nginx/prod.conf` configura o roteamento:
+
 ```nginx
-location /auth/ {
-    proxy_pass http://auth-service:3010/;
-    # ...headers, rate limit, etc.
+# Rate limiting
+limit_req_zone $binary_remote_addr zone=api_limit:10m rate=5r/s;
+
+server {
+    listen 80;
+    server_name _;
+
+    # Cabeçalhos de segurança
+    add_header X-Content-Type-Options nosniff;
+    add_header X-Frame-Options SAMEORIGIN;
+    add_header X-XSS-Protection "1; mode=block";
+
+    # Rota raiz
+    location = / {
+        return 200 'Aurora gateway ativo';
+        add_header Content-Type text/plain;
+    }
+
+    # Rotas dos microsserviços
+    location /auth/ {
+        limit_req zone=api_limit burst=15 nodelay;
+        proxy_pass http://auth-service:3010/;
+    }
+
+    location /users/ {
+        limit_req zone=api_limit burst=15 nodelay;
+        proxy_pass http://users-service:3011/;
+    }
+
+    location /events/ {
+        limit_req zone=api_limit burst=15 nodelay;
+        proxy_pass http://events-service:3012/;
+    }
+
+    location /registrations/ {
+        limit_req zone=api_limit burst=15 nodelay;
+        proxy_pass http://registrations-service:3013;
+    }
 }
 ```
 
-#### Comandos de teste
-- Subir o stack: `docker compose -f docker-compose.prod.yml up -d`
-- Testar health dos serviços via gateway:
-  - `curl http://<host>:80/auth/health`
-  - `curl http://<host>:80/users/health`
-  - `curl http://<host>:80/events/health`
-  - `curl http://<host>:80/registrations/health`
-- Testar HTTPS (se configurado):
-  - `curl -k https://<host>:443/auth/health`
+---
 
-#### Observações
-- Em dev, o acesso é feito via `http://localhost:8080/<serviço>/...`.
-- Para ensaiar HTTPS em laboratório, gerar certificado autoassinado em `nginx/certs` e descomentar o bloco e porta 8443 no compose dev.
-- Após validação, remover exposição direta das portas dos serviços em todos os ambientes.
+### Arquitetura final
 
-### Próximos passos
-- [ ] Consolidar o gateway como único ponto de entrada em produção.
-- [ ] Remover exposição direta dos serviços.
-- [ ] Documentar e versionar a configuração do Nginx.
-- [ ] Planejar automação de emissão de certificados TLS.
-- [ ] Validar logs, rate limiting e headers de segurança no gateway.
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         INTERNET                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                              ↓                                   │
+│              Oracle Cloud Security List (80, 443)                │
+│                              ↓                                   │
+│                    iptables (ACCEPT 80, 443)                     │
+│                              ↓                                   │
+│              ┌──────────────────────────────┐                    │
+│              │   Nginx Gateway (porta 80)   │                    │
+│              │   aurora-gateway-deploy      │                    │
+│              └──────────────────────────────┘                    │
+│                              ↓                                   │
+│   ┌──────────────────────────────────────────────────────────┐  │
+│   │                aurora_network (interna)                   │  │
+│   │                                                           │  │
+│   │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────────┐ │  │
+│   │  │  auth   │ │  users  │ │ events  │ │  registrations  │ │  │
+│   │  │  :3010  │ │  :3011  │ │  :3012  │ │      :3013      │ │  │
+│   │  └─────────┘ └─────────┘ └─────────┘ └─────────────────┘ │  │
+│   │                         ↓                                 │  │
+│   │              ┌──────────────────────┐                     │  │
+│   │              │   PostgreSQL (db)    │                     │  │
+│   │              │     aurora-db        │                     │  │
+│   │              └──────────────────────┘                     │  │
+│   └──────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-**Benefícios esperados:**
-- Segurança: ponto único de entrada com autenticação centralizada
-- Observabilidade: logs centralizados de todas as requisições
-- Controle: rate limiting, CORS e políticas de segurança em um só lugar
+---
 
-**Status:** Em andamento. Compose de dev já utiliza gateway; produção em fase de transição para exposição controlada.
+### Checklist para alunos replicarem
 
-- **Problema identificado:** auth-service segue exposto diretamente na porta 3010; não existe gateway central. Não há domínio ou certificado provisionado, e os alunos ainda não praticaram a configuração de um ponto de entrada único.
-- **Fundamentação:** publicar apenas um gateway reduz superfície de ataque, centraliza autenticação, CORS e rate limiting, facilita observabilidade (logs/request-id) e gerenciamento de TLS. Expor cada serviço individualmente duplica configuração de segurança e permite bypass de controles.
-- **Decisão:** adotar o Nginx já esboçado em `production/docker-compose.prod.yml` como gateway padrão, usando o template `production/nginx/default.conf` com roteamento por path (`/auth`, `/users`, `/events`, `/registrations`). Apenas o gateway publica portas; serviços permanecem somente na rede interna.
-- **TLS/domínio:** sem domínio real não é possível emitir certificado válido via Certbot/Let's Encrypt. Opções:
-  - **Prod (recomendado):** quando houver DNS apontado para o host, usar Certbot (desafio HTTP-01) com o gateway escutando 80/443, montar `/etc/letsencrypt` e ativar redirect HTTP→HTTPS no Nginx.
-  - **Lab/ensaio:** gerar certificado autoassinado (ex.: `openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout selfsigned.key -out selfsigned.crt -subj "/CN=localhost"`), montar no container e apontar `ssl_certificate`/`ssl_certificate_key` para esses arquivos. Navegadores exibirão aviso; não usar em produção. Útil para treinar pipeline TLS e verificar configuração de proxy seguro mesmo sem domínio real.
-  - **Sem TLS:** operar em HTTP até provisionar domínio/certificado, com ciência de que tráfego não estará cifrado.
-- **Impacto em portas:** após o gateway estar funcional, remover blocos `ports:` dos serviços de aplicação nos composes principais, mantendo apenas o gateway exposto. Todo tráfego externo deve passar pelo Nginx.
-- **Plano de implementação (Fase 6):** (1) incluir gateway nos composes principais reutilizando o template; (2) versionar config de Nginx com headers de segurança básicos e rate limiting; (3) documentar passos de TLS com Certbot para quando o domínio estiver disponível; (4) só então cortar exposições diretas; (5) validar rotas/health via gateway e registrar comandos de verificação.
-- **Implementação em dev para prática e testes:** `docker-compose.dev.yml` passou a ter o serviço `gateway` (Nginx 1.25) publicado em `8080:80` e opcional `8443:443` (quando habilitado o bloco HTTPS). A config está em `nginx/dev.conf`, roteando `/auth`, `/users`, `/events`, `/registrations` para os serviços internos e com rate limit leve. Para ensaiar HTTPS em lab, gerar cert autoassinado em `nginx/certs` e descomentar bloco e porta 8443; testar com `curl -k https://localhost:8443/<rota>`.
-- **Notas dos testes em dev (12/15 - manhã):** após subir o stack, foi preciso remover o volume (`docker compose -f docker-compose.dev.yml down -v`) para alinhar credenciais do Postgres; os serviços voltaram a subir com `postgres/postgres`. Ajustei o `auth-service` para apontar o comando para `dist/app/src/main.js` (em vez de `dist/src/main.js`) via `package.json` e `docker-compose.dev.yml`. O gateway responde internamente, mas a rota `/auth/health` retornou 502 enquanto o auth-service reiniciava por não encontrar `package.json` no runtime do container; próximo passo é ajustar o Dockerfile do auth-service (copiar `package.json` no stage final ou usar `node dist/app/src/main.js` direto) e revalidar as rotas via gateway.
-- **Correção e validação completa (12/15 - noite até 12/16):**
-  - `auth-service` no compose dev passou a usar `node dist/app/src/main.js` (o Dockerfile não copia `package.json` no stage final).
-  - Gateway dev/prod usa config dedicada (`nginx/dev.conf`, `nginx/prod.conf`), com rate limit e regex para `/registrations/*` preservando o prefixo ao encaminhar para o serviço.
-  - health do registrations-service isolado em `HealthController` (`/health`), eliminando redundância no controller principal.
-  - TLS de laboratório habilitável em dev com certificado autoassinado em `nginx/certs` e porta `8443` publicada.
-  - Validação via gateway em dev (HTTP/HTTPS):  
-    - `http://localhost:8080/auth/health` → `{"status":"ok"}` ✅  
-    - `http://localhost:8080/users/health` → `{"status":"ok"}` ✅  
-    - `http://localhost:8080/events/health` → `{"status":"ok"}` ✅  
-    - `http://localhost:8080/registrations/health` → `{"status":"ok"}` ✅  
-  Gateway operacional com roteamento correto para os 4 serviços; próximo passo é manter apenas o gateway exposto em todos os ambientes (Fase 6).
+#### Pré-requisitos
+- [ ] VPS Oracle Cloud com Docker instalado
+- [ ] Repositório clonado na VPS
+- [ ] Arquivo `.env.prod` configurado
+- [ ] Secret `GH_PAT` com token válido (scope: `read:packages`)
+
+#### Configuração do firewall
+- [ ] Adicionar regra iptables para porta 80: `sudo iptables -I INPUT 5 -p tcp --dport 80 -j ACCEPT`
+- [ ] Adicionar regra para porta 443: `sudo iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT`
+- [ ] Salvar regras: `sudo sh -c 'iptables-save > /etc/iptables.rules'`
+- [ ] Liberar portas 80-443 na Oracle Cloud Security List
+
+#### Deploy
+- [ ] Login no GHCR: `echo "$GH_PAT" | docker login ghcr.io -u <usuario> --password-stdin`
+- [ ] Pull das imagens: `docker compose --env-file .env.prod -f docker-compose.deploy.yml pull`
+- [ ] Subir containers: `docker compose --env-file .env.prod -f docker-compose.deploy.yml up -d`
+- [ ] Verificar status: `docker compose --env-file .env.prod -f docker-compose.deploy.yml ps`
+
+#### Verificação
+- [ ] Teste interno: `curl http://127.0.0.1/`
+- [ ] Teste externo: `curl http://<IP_VPS>/`
+- [ ] Health checks: `curl http://<IP_VPS>/auth/health`
+
+---
+
+### Lições aprendidas
+
+1. **Firewall em camadas:** Em cloud providers, o bloqueio pode ocorrer em múltiplas camadas (VM + cloud networking). Verificar AMBAS.
+
+2. **Ordem das regras iptables:** Regras são processadas em ordem. Uma regra `REJECT all` no meio da lista bloqueia tudo que vem depois.
+
+3. **Debug sistemático:** 
+   - Se funciona interno mas não externo → problema de firewall
+   - Se não funciona nem interno → problema de aplicação/container
+
+4. **Workflows de automação:** Criar workflows para tarefas repetitivas (verificação, correção) economiza tempo e padroniza processos.
+
+5. **SSH Tunnel como workaround:** Útil para redes corporativas restritivas enquanto aguarda liberação da TI.
+
+---
+
+### Status
+
+**Concluído em 16/12/2025:**
+- ✅ Gateway Nginx operacional na VPS
+- ✅ Todos os endpoints acessíveis via gateway
+- ✅ Firewall (iptables + Oracle Cloud) configurado
+- ✅ Workflows de verificação e correção criados
+- ✅ Documentação completa para alunos
+
+
+
+---
+
+## Fases concluídas
+
+### ✅ Fase 6: Exposição controlada de serviços (CONCLUÍDA - 16/12/2025)
+**Problema original:** Serviços expostos diretamente em portas individuais sem gateway centralizado.
+
+**Implementação realizada:**
+- [x] Avaliar quais serviços precisam estar acessíveis externamente → Todos via gateway
+- [x] Implementar API Gateway (Nginx) como ponto único de entrada → `aurora-gateway-deploy` na porta 80
+- [x] Configurar rotas do gateway para cada serviço → `/auth`, `/users`, `/events`, `/registrations`
+- [x] Remover exposição direta das portas dos serviços → Nenhum serviço expõe portas além do gateway
+- [x] Todo tráfego externo passa pelo gateway com rate-limiting → `limit_req zone=api_limit burst=15 nodelay`
+
+**Arquivos modificados:**
+- `docker-compose.deploy.yml` - Gateway Nginx adicionado, serviços sem `ports:`
+- `nginx/prod.conf` - Configuração de rotas e rate limiting
+- `.github/workflows/deploy-to-vps.yml` - Deploy automático via SSH
+- `.github/workflows/check-vps-gateway.yml` - Workflow de verificação
+- `.github/workflows/fix-vps-firewall.yml` - Workflow de correção de firewall
+
+**Benefícios alcançados:**
+- ✅ Segurança: ponto único de entrada, serviços isolados na rede interna
+- ✅ Observabilidade: logs centralizados no Nginx gateway
+- ✅ Controle: rate limiting configurado (5 req/s por IP, burst 15)
+- ✅ Headers de segurança: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection
+
+**Validação:**
+```bash
+# Todos os endpoints respondem via gateway
+curl http://64.181.173.121/auth/health     # 200 OK
+curl http://64.181.173.121/users/health    # 200 OK
+curl http://64.181.173.121/events/health   # 200 OK
+curl http://64.181.173.121/registrations/health  # 200 OK
+```
 
 ---
 
 ## Próximas fases a implementar
 
-### Fase 6: Exposição controlada de serviços (Curto prazo - 1-2 dias)
-**Problema:** Apenas auth-service está exposto publicamente na porta 3010. Outros serviços podem precisar de acesso externo controlado.
 
-**Tarefas:**
-- [ ] Avaliar quais serviços precisam estar acessíveis externamente
-- [ ] Implementar API Gateway (Nginx/Traefik) como ponto único de entrada
-- [ ] Configurar rotas do gateway para cada serviço
-- [ ] Remover exposição direta das portas dos serviços
-- [ ] Todo tráfego externo passa pelo gateway com autenticação/rate-limiting
-
-**Benefícios:**
-- Segurança: ponto único de entrada com autenticação centralizada
-- Observabilidade: logs centralizados de todas as requisições
-- Controle: rate limiting, CORS, e políticas de segurança em um só lugar
-
----
 
 ### Fase 7: Monitoramento e observabilidade (Médio prazo - 1 semana)
 **Problema:** Não há visibilidade sobre o comportamento dos serviços em produção.
