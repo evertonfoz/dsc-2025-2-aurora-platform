@@ -1,9 +1,18 @@
 import { Controller, Get } from '@nestjs/common';
 
-@Controller('health')
+@Controller()
 export class HealthController {
-  @Get()
-  getHealth() {
+  private buildPayload() {
     return { status: 'ok' };
+  }
+
+  @Get('health')
+  getHealth() {
+    return this.buildPayload();
+  }
+
+  @Get('registrations/health')
+  getRegistrationsHealth() {
+    return this.buildPayload();
   }
 }

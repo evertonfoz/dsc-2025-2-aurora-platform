@@ -499,6 +499,64 @@ images: ghcr.io/${{ github.repository }}/auth-service
 
 ## Caso pedagógico 07 — Gateway reverso (Nginx) e exposição controlada
 
+### Problema identificado
+Atualmente, o `auth-service` segue exposto diretamente na porta 3010 em produção, sem um gateway centralizado. Isso amplia a superfície de ataque, dificulta a centralização de autenticação, CORS, rate limiting e observabilidade, além de permitir o bypass de controles de segurança. Não há domínio ou certificado provisionado, e a configuração de um ponto de entrada único ainda não foi praticada.
+
+### Fundamentação
+Publicar apenas um gateway (Nginx) reduz a superfície de ataque, centraliza autenticação, CORS e rate limiting, facilita observabilidade (logs/request-id) e gerenciamento de TLS. Expor cada serviço individualmente duplica configuração de segurança e permite bypass de controles. O padrão recomendado é que apenas o gateway publique portas externas, mantendo os serviços acessíveis apenas na rede interna do Docker Compose.
+
+### Decisão e abordagem
+Adotar o Nginx já esboçado em `production/docker-compose.prod.yml` como gateway padrão, usando o template `production/nginx/default.conf` com roteamento por path (`/auth`, `/users`, `/events`, `/registrations`). Apenas o gateway publica portas; serviços permanecem somente na rede interna. O compose de desenvolvimento (`docker-compose.dev.yml`) já reflete essa arquitetura, expondo apenas o gateway em `8080:80`.
+
+#### TLS/domínio
+- **Produção:** Quando houver DNS apontado para o host, usar Certbot (desafio HTTP-01) com o gateway escutando 80/443, montar `/etc/letsencrypt` e ativar redirect HTTP→HTTPS no Nginx.
+- **Lab/ensaio:** Gerar certificado autoassinado (exemplo: `openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout selfsigned.key -out selfsigned.crt -subj "/CN=localhost"`), montar no container e apontar `ssl_certificate`/`ssl_certificate_key` para esses arquivos. Útil para treinar pipeline TLS mesmo sem domínio real.
+- **Sem TLS:** Operar em HTTP até provisionar domínio/certificado, ciente de que o tráfego não estará cifrado.
+
+### Implementação prática
+1. Incluir o serviço `gateway` (Nginx) nos composes principais, reutilizando o template de configuração.
+2. Versionar a config do Nginx com headers de segurança básicos e rate limiting.
+3. Documentar passos de TLS com Certbot para quando o domínio estiver disponível.
+4. Remover blocos `ports:` dos serviços de aplicação, mantendo apenas o gateway exposto.
+5. Validar rotas e health checks via gateway e registrar comandos de verificação.
+
+#### Exemplo de configuração de rota no Nginx (`nginx/prod.conf`):
+```nginx
+location /auth/ {
+    proxy_pass http://auth-service:3010/;
+    # ...headers, rate limit, etc.
+}
+```
+
+#### Comandos de teste
+- Subir o stack: `docker compose -f docker-compose.prod.yml up -d`
+- Testar health dos serviços via gateway:
+  - `curl http://<host>:80/auth/health`
+  - `curl http://<host>:80/users/health`
+  - `curl http://<host>:80/events/health`
+  - `curl http://<host>:80/registrations/health`
+- Testar HTTPS (se configurado):
+  - `curl -k https://<host>:443/auth/health`
+
+#### Observações
+- Em dev, o acesso é feito via `http://localhost:8080/<serviço>/...`.
+- Para ensaiar HTTPS em laboratório, gerar certificado autoassinado em `nginx/certs` e descomentar o bloco e porta 8443 no compose dev.
+- Após validação, remover exposição direta das portas dos serviços em todos os ambientes.
+
+### Próximos passos
+- [ ] Consolidar o gateway como único ponto de entrada em produção.
+- [ ] Remover exposição direta dos serviços.
+- [ ] Documentar e versionar a configuração do Nginx.
+- [ ] Planejar automação de emissão de certificados TLS.
+- [ ] Validar logs, rate limiting e headers de segurança no gateway.
+
+**Benefícios esperados:**
+- Segurança: ponto único de entrada com autenticação centralizada
+- Observabilidade: logs centralizados de todas as requisições
+- Controle: rate limiting, CORS e políticas de segurança em um só lugar
+
+**Status:** Em andamento. Compose de dev já utiliza gateway; produção em fase de transição para exposição controlada.
+
 - **Problema identificado:** auth-service segue exposto diretamente na porta 3010; não existe gateway central. Não há domínio ou certificado provisionado, e os alunos ainda não praticaram a configuração de um ponto de entrada único.
 - **Fundamentação:** publicar apenas um gateway reduz superfície de ataque, centraliza autenticação, CORS e rate limiting, facilita observabilidade (logs/request-id) e gerenciamento de TLS. Expor cada serviço individualmente duplica configuração de segurança e permite bypass de controles.
 - **Decisão:** adotar o Nginx já esboçado em `production/docker-compose.prod.yml` como gateway padrão, usando o template `production/nginx/default.conf` com roteamento por path (`/auth`, `/users`, `/events`, `/registrations`). Apenas o gateway publica portas; serviços permanecem somente na rede interna.
